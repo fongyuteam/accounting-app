@@ -90,18 +90,49 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
+function checkLatestVersionMac() {
+  const https = require('https');
+  const currentVersion = app.getVersion();
+  const req = https.request({
+    hostname: 'api.github.com',
+    path: '/repos/fongyuteam/accounting-app/releases/latest',
+    method: 'GET',
+    headers: { 'User-Agent': 'accounting-app' }
+  }, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try {
+        const release = JSON.parse(data);
+        const latestVersion = release.tag_name?.replace(/^v/, '');
+        if (latestVersion && latestVersion !== currentVersion) {
+          mainWindow?.webContents.send('update-available-mac', latestVersion, release.html_url);
+        }
+      } catch(e) {}
+    });
+  });
+  req.on('error', () => {});
+  req.end();
+}
+
 app.whenReady().then(() => {
   initDatabase();
   createWindow();
   // 安裝版才啟動自動更新
   if (app.isPackaged) {
-    autoUpdater.checkForUpdatesAndNotify();
-    autoUpdater.on('update-available', () => {
-      mainWindow?.webContents.send('update-available');
-    });
-    autoUpdater.on('update-downloaded', () => {
-      mainWindow?.webContents.send('update-downloaded');
-    });
+    if (process.platform === 'darwin') {
+      // Mac：手動檢查 GitHub 最新版本，提示用戶下載
+      checkLatestVersionMac();
+    } else {
+      // Windows：完整自動更新
+      autoUpdater.checkForUpdatesAndNotify();
+      autoUpdater.on('update-available', () => {
+        mainWindow?.webContents.send('update-available');
+      });
+      autoUpdater.on('update-downloaded', () => {
+        mainWindow?.webContents.send('update-downloaded');
+      });
+    }
   }
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });

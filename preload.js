@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('updater', {
   onUpdateAvailable: (cb) => ipcRenderer.on('update-available', cb),
   onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', cb),
+  onUpdateAvailableMac: (cb) => ipcRenderer.on('update-available-mac', cb),
   install: () => ipcRenderer.invoke('updater:install')
 });
 contextBridge.exposeInMainWorld('api', {

@@ -149,9 +149,12 @@ tr:hover td { background:var(--bg); }
 <body>
 
 <!-- 更新通知條 -->
-<div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accent);color:#fff;padding:10px 20px;display:none;align-items:center;justify-content:space-between;font-size:13px;">
+<div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accent);color:#fff;padding:10px 20px;align-items:center;justify-content:space-between;font-size:13px;">
   <span id="update-msg">有新版本可用，正在背景下載...</span>
-  <button id="update-btn" onclick="window.updater && window.updater.install()" style="display:none;background:#fff;color:var(--accent);border:none;border-radius:6px;padding:4px 14px;cursor:pointer;font-weight:600;">立即重啟安裝</button>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button id="update-btn" onclick="window.updater && window.updater.install()" style="display:none;background:#fff;color:var(--accent);border:none;border-radius:6px;padding:4px 14px;cursor:pointer;font-weight:600;">立即重啟安裝</button>
+    <button id="update-dl-btn" onclick="document.getElementById('update-bar').style.display='none'" style="display:none;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.5);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;">稍後</button>
+  </div>
 </div>
 
 <!-- API Key Modal 已移至拍照辨識頁面 -->
@@ -638,13 +641,24 @@ tr:hover td { background:var(--bg); }
 <input type="file" id="_csvCustInput"  accept=".csv"           style="display:none">
 <script>
 if (window.updater) {
+  // Windows：自動下載更新
   window.updater.onUpdateAvailable(() => {
-    const bar = document.getElementById('update-bar');
-    bar.style.display = 'flex';
+    document.getElementById('update-bar').style.display = 'flex';
   });
   window.updater.onUpdateDownloaded(() => {
     document.getElementById('update-msg').textContent = '新版本已下載完成，重啟後即可更新';
     document.getElementById('update-btn').style.display = 'inline-block';
+    document.getElementById('update-dl-btn').style.display = 'inline-block';
+  });
+  // Mac：提示手動下載
+  window.updater.onUpdateAvailableMac((_, version, url) => {
+    document.getElementById('update-msg').textContent = `有新版本 ${version} 可用`;
+    const btn = document.getElementById('update-btn');
+    btn.textContent = '前往下載';
+    btn.onclick = () => window.open(url, '_blank');
+    btn.style.display = 'inline-block';
+    document.getElementById('update-dl-btn').style.display = 'inline-block';
+    document.getElementById('update-bar').style.display = 'flex';
   });
 }
 </script>
