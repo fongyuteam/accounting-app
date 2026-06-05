@@ -165,7 +165,7 @@ function clearApi() {
 function skipApi() {}
 
 // ── Tab ──
-const titles = { scan:'拍照辨識', excel:'Excel 匯入', clients:'客戶付款追蹤', income:'入帳管理', expense:'出帳管理', records:'所有紀錄', gdrive:'Google Drive 同步', customers:'客戶名單' };
+const titles = { scan:'拍照辨識', excel:'Excel 匯入', clients:'客戶付款追蹤', income:'入帳管理', expense:'出帳管理', records:'所有紀錄', report:'報表圖表', gdrive:'Google Drive 同步', customers:'客戶名單' };
 function showTab(name) {
   Object.keys(titles).forEach(t => {
     document.getElementById('nav-'+t)?.classList.toggle('active', t===name);
@@ -177,11 +177,13 @@ function showTab(name) {
   if (name==='scan') renderAiHist();
   if (name==='customers') renderCustomers();
   if (name==='gdrive') { initGoogleAuth(); updateMonthOptions(); }
+  if (name==='report') renderReport();
 }
 
 async function loadAll() {
   await Promise.all([renderIncome(), renderExpense(), renderReceivables(), renderAiHist(), renderCustomers()]);
   updateSummary();
+  checkOverdue();
 }
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -205,9 +207,40 @@ async function renderIncome() {
     <td class="amount-pos">${fmt(e.amount)}</td>
     <td style="color:var(--hint);font-size:12px">${e.note||'—'}</td>
     <td>${srcBadge(e.source)}</td>
-    <td><button class="btn btn-sm btn-danger" onclick="delInc(${e.id})">刪除</button></td></tr>`).join('')
+    <td style="display:flex;gap:4px">
+      <button class="btn btn-sm" onclick="openIncEdit(${e.id},'${esc(e.date)}','${esc(e.client)}','${esc(e.title)}','${esc(e.category||'')}',${e.amount},'${esc(e.note||'')}')">編輯</button>
+      <button class="btn btn-sm btn-danger" onclick="delInc(${e.id})">刪除</button>
+    </td></tr>`).join('')
     : `<tr class="empty-row"><td colspan="8">尚無入帳紀錄</td></tr>`;
   updateSummary();
+}
+
+function openIncEdit(id,date,client,title,cat,amount,note) {
+  const isCustom = !['服務費','產品銷售','顧問費','維護費'].includes(cat);
+  document.getElementById('inc-edit-id').value = id;
+  document.getElementById('inc-edit-date').value = date;
+  document.getElementById('inc-edit-client').value = client;
+  document.getElementById('inc-edit-title').value = title;
+  document.getElementById('inc-edit-amount').value = amount;
+  document.getElementById('inc-edit-note').value = note;
+  const sel = document.getElementById('inc-edit-cat');
+  const custom = document.getElementById('inc-edit-cat-custom');
+  if (isCustom) { sel.value='其他'; custom.style.display=''; custom.value=cat; }
+  else { sel.value=cat; custom.style.display='none'; custom.value=''; }
+  document.getElementById('incEditModal').classList.remove('hidden');
+}
+function closeIncEdit() { document.getElementById('incEditModal').classList.add('hidden'); }
+async function saveIncEdit() {
+  const id = parseInt(document.getElementById('inc-edit-id').value);
+  const date = document.getElementById('inc-edit-date').value;
+  const client = document.getElementById('inc-edit-client').value.trim();
+  const title = document.getElementById('inc-edit-title').value.trim();
+  const amount = parseFloat(document.getElementById('inc-edit-amount').value);
+  const note = document.getElementById('inc-edit-note').value.trim();
+  const category = getCatVal('inc-edit-cat','inc-edit-cat-custom');
+  if (!date||!client||!title||!amount) { alert('請填寫所有必填欄位'); return; }
+  await window.api.income.update({id,date,client,title,category,amount,note});
+  closeIncEdit(); await renderIncome();
 }
 
 async function addIncome() {
@@ -392,6 +425,7 @@ async function renderReceivables() {
     <td><span class="badge ${bm[s]}">${lm[s]}</span>${s==='paid'&&r.paid_date?`<br><span style="font-size:10px;color:var(--hint)">${r.paid_date}</span>`:''}</td>
     <td style="display:flex;gap:4px;flex-wrap:wrap">
       ${s!=='paid'?`<button class="btn btn-sm btn-success" onclick="markPaid(${r.id})">✓ 確認收款</button>`:''}
+      <button class="btn btn-sm" onclick="openRecvEdit(${r.id},'${esc(r.issue_date)}','${esc(r.due_date)}','${esc(r.client)}','${esc(r.description)}','${esc(r.invoice_no||'')}',${r.amount})">編輯</button>
       <button class="btn btn-sm btn-danger" onclick="delRecv(${r.id})">刪除</button>
     </td></tr>`;
   }).join('') : `<tr class="empty-row"><td colspan="8">尚無應收帳款</td></tr>`;
@@ -482,6 +516,135 @@ async function updateSummary() {
 }
 
 async function exportCSV() { await window.api.export.csv(); }
+
+function openRecvEdit(id,issue,due,client,desc,inv,amount) {
+  document.getElementById('recv-edit-id').value = id;
+  document.getElementById('recv-edit-issue').value = issue;
+  document.getElementById('recv-edit-due').value = due;
+  document.getElementById('recv-edit-client').value = client;
+  document.getElementById('recv-edit-desc').value = desc;
+  document.getElementById('recv-edit-inv').value = inv;
+  document.getElementById('recv-edit-amount').value = amount;
+  document.getElementById('recvEditModal').classList.remove('hidden');
+}
+function closeRecvEdit() { document.getElementById('recvEditModal').classList.add('hidden'); }
+async function saveRecvEdit() {
+  const id = parseInt(document.getElementById('recv-edit-id').value);
+  const issue = document.getElementById('recv-edit-issue').value;
+  const due = document.getElementById('recv-edit-due').value;
+  const client = document.getElementById('recv-edit-client').value.trim();
+  const desc = document.getElementById('recv-edit-desc').value.trim();
+  const inv = document.getElementById('recv-edit-inv').value.trim();
+  const amount = parseFloat(document.getElementById('recv-edit-amount').value);
+  if (!issue||!due||!client||!desc||!amount) { alert('請填寫所有必填欄位'); return; }
+  await window.api.receivables.update({id,issue,due,client,desc,invoice:inv,amount});
+  closeRecvEdit(); await renderReceivables();
+}
+
+// ── 逾期付款提醒 ──
+async function checkOverdue() {
+  const rows = await window.api.receivables.getAll();
+  const overdue = rows.filter(r => getStatus(r) === 'overdue');
+  if (!overdue.length) return;
+  document.getElementById('overdueList').innerHTML = `
+    <p style="margin-bottom:12px;color:var(--muted);font-size:13px">以下 ${overdue.length} 筆應收帳款已逾期，請盡快跟進：</p>
+    <table style="width:100%;font-size:13px;border-collapse:collapse">
+      <thead><tr style="color:var(--muted);border-bottom:1px solid var(--border)">
+        <th style="text-align:left;padding:6px 8px">客戶</th>
+        <th style="text-align:left;padding:6px 8px">金額</th>
+        <th style="text-align:left;padding:6px 8px">應付日期</th>
+      </tr></thead>
+      <tbody>${overdue.map(r=>`<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:6px 8px">${r.client}</td>
+        <td style="padding:6px 8px;color:var(--expense);font-weight:500">${fmt(r.amount)}</td>
+        <td style="padding:6px 8px;color:var(--danger)">${r.due_date}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+  document.getElementById('overdueModal').classList.remove('hidden');
+}
+
+// ── 報表圖表 ──
+async function renderReport() {
+  const [inc, exp] = await Promise.all([window.api.income.getAll(), window.api.expense.getAll()]);
+  drawBarChart(inc, exp);
+  drawPieChart(exp);
+}
+
+function drawBarChart(inc, exp) {
+  const canvas = document.getElementById('barChart');
+  if (!canvas) return;
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i);
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const incM = {}, expM = {};
+  months.forEach(m => { incM[m] = 0; expM[m] = 0; });
+  inc.forEach(r => { if (incM[r.date.slice(0,7)] !== undefined) incM[r.date.slice(0,7)] += r.amount; });
+  exp.forEach(r => { if (expM[r.date.slice(0,7)] !== undefined) expM[r.date.slice(0,7)] += r.amount; });
+  const maxVal = Math.max(...months.map(m => Math.max(incM[m], expM[m])), 1);
+  const W = canvas.offsetWidth || 600;
+  canvas.width = W; canvas.height = 220;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, 220);
+  const pL=60, pR=20, pT=20, pB=40, cW=W-pL-pR, cH=220-pT-pB;
+  const groupW = cW / months.length, barW = groupW * 0.28;
+  // Grid lines
+  for (let i = 0; i <= 4; i++) {
+    const y = pT + cH - (cH * i / 4);
+    ctx.strokeStyle = '#e0e0e0'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pL, y); ctx.lineTo(W-pR, y); ctx.stroke();
+    ctx.fillStyle = '#999'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    const val = maxVal * i / 4;
+    ctx.fillText(val >= 10000 ? Math.round(val/1000)+'K' : Math.round(val), pL-4, y+4);
+  }
+  months.forEach((m, i) => {
+    const x = pL + groupW * i + groupW * 0.1;
+    const iH = Math.max((incM[m] / maxVal) * cH, 0);
+    const eH = Math.max((expM[m] / maxVal) * cH, 0);
+    ctx.fillStyle = '#0F6E56';
+    ctx.fillRect(x, pT + cH - iH, barW, iH);
+    ctx.fillStyle = '#993C1D';
+    ctx.fillRect(x + barW + 2, pT + cH - eH, barW, eH);
+    ctx.fillStyle = '#888'; ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(m.slice(5)+'月', x + barW, pT + cH + 16);
+  });
+}
+
+function drawPieChart(exp) {
+  const canvas = document.getElementById('pieChart');
+  if (!canvas) return;
+  const catMap = {};
+  exp.forEach(r => { const c = r.category||'其他'; catMap[c] = (catMap[c]||0) + r.amount; });
+  const entries = Object.entries(catMap).sort((a,b) => b[1]-a[1]);
+  const total = entries.reduce((s,[,v]) => s+v, 0);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 200, 200);
+  if (!total) {
+    ctx.fillStyle = '#999'; ctx.font = '13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('尚無出帳資料', 100, 105);
+    document.getElementById('pieLegend').innerHTML = ''; return;
+  }
+  const colors = ['#534AB7','#993C1D','#0F6E56','#BA7517','#3B6D11','#A32D2D','#4A90D9','#7B68EE'];
+  let angle = -Math.PI / 2;
+  entries.forEach(([,val], i) => {
+    const slice = (val / total) * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(100, 100);
+    ctx.arc(100, 100, 85, angle, angle + slice);
+    ctx.closePath(); ctx.fillStyle = colors[i % colors.length]; ctx.fill();
+    angle += slice;
+  });
+  // Donut hole
+  ctx.beginPath(); ctx.arc(100, 100, 48, 0, Math.PI*2);
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  ctx.fillStyle = isDark ? '#242422' : '#ffffff'; ctx.fill();
+  document.getElementById('pieLegend').innerHTML = entries.map(([cat,val],i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:13px">
+      <div style="width:12px;height:12px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div>
+      <span>${cat}</span>
+      <span style="color:var(--muted);margin-left:auto;font-size:12px">${Math.round(val/total*100)}%</span>
+    </div>`).join('');
+}
 
 async function dbBackup() {
   const ok = await window.api.db.backup();

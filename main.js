@@ -113,6 +113,11 @@ ipcMain.handle('income:add', (_, d) => {
   return { id: r.lastInsertRowid, ...d };
 });
 ipcMain.handle('income:delete', (_, id) => { db.prepare('DELETE FROM income WHERE id=?').run(id); return true; });
+ipcMain.handle('income:update', (_, d) => {
+  db.prepare('UPDATE income SET date=?,client=?,title=?,category=?,amount=?,note=? WHERE id=?')
+    .run(d.date, d.client, d.title, d.category, d.amount, d.note||'', d.id);
+  return true;
+});
 
 // ── 出帳 ──
 ipcMain.handle('expense:getAll', () => db.prepare('SELECT * FROM expense ORDER BY date DESC').all());
@@ -139,6 +144,11 @@ ipcMain.handle('receivables:markPaid', (_, id) => {
   return true;
 });
 ipcMain.handle('receivables:delete', (_, id) => { db.prepare('DELETE FROM receivables WHERE id=?').run(id); return true; });
+ipcMain.handle('receivables:update', (_, d) => {
+  db.prepare('UPDATE receivables SET issue_date=?,due_date=?,client=?,description=?,invoice_no=?,amount=? WHERE id=?')
+    .run(d.issue, d.due, d.client, d.desc, d.invoice||'', d.amount, d.id);
+  return true;
+});
 
 // ── 客戶管理 ──
 ipcMain.handle('customers:getAll', () => db.prepare('SELECT * FROM customers ORDER BY name ASC').all());

@@ -215,6 +215,72 @@ tr:hover td { background:var(--bg); }
   </div>
 </div>
 
+<!-- 入帳編輯 Modal -->
+<div class="modal-overlay hidden" id="incEditModal">
+  <div class="modal">
+    <h2>編輯入帳紀錄</h2>
+    <input type="hidden" id="inc-edit-id" />
+    <div class="fg c2" style="margin-bottom:8px">
+      <input type="date" id="inc-edit-date" />
+      <input type="number" id="inc-edit-amount" placeholder="金額（元）" min="0" />
+    </div>
+    <div class="fg c1" style="margin-bottom:8px">
+      <input type="text" id="inc-edit-client" placeholder="客戶名稱" />
+    </div>
+    <div class="fg c2" style="margin-bottom:8px">
+      <input type="text" id="inc-edit-title" placeholder="款項名稱" />
+      <select id="inc-edit-cat" onchange="toggleCatCustom('inc-edit-cat','inc-edit-cat-custom')">
+        <option value="服務費">服務費</option>
+        <option value="產品銷售">產品銷售</option>
+        <option value="顧問費">顧問費</option>
+        <option value="維護費">維護費</option>
+        <option value="其他">其他（自訂）</option>
+      </select>
+      <input type="text" id="inc-edit-cat-custom" placeholder="請輸入自訂類別" style="display:none;margin-top:4px"/>
+    </div>
+    <div class="fg c1"><textarea id="inc-edit-note" placeholder="備註"></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeIncEdit()">取消</button>
+      <button class="btn btn-primary" onclick="saveIncEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 應收帳款編輯 Modal -->
+<div class="modal-overlay hidden" id="recvEditModal">
+  <div class="modal">
+    <h2>編輯應收帳款</h2>
+    <input type="hidden" id="recv-edit-id" />
+    <div class="fg c3" style="margin-bottom:8px">
+      <input type="date" id="recv-edit-issue" />
+      <input type="date" id="recv-edit-due" />
+      <input type="number" id="recv-edit-amount" placeholder="金額（元）" min="0" />
+    </div>
+    <div class="fg c2" style="margin-bottom:8px">
+      <input type="text" id="recv-edit-client" placeholder="客戶名稱" />
+      <input type="text" id="recv-edit-inv" placeholder="發票 / 單號（選填）" />
+    </div>
+    <div class="fg c1" style="margin-bottom:8px">
+      <input type="text" id="recv-edit-desc" placeholder="說明" />
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeRecvEdit()">取消</button>
+      <button class="btn btn-primary" onclick="saveRecvEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 逾期付款提醒 Modal -->
+<div class="modal-overlay hidden" id="overdueModal">
+  <div class="modal">
+    <h2>⚠ 逾期付款提醒</h2>
+    <div id="overdueList"></div>
+    <div class="modal-foot">
+      <button class="btn btn-primary" onclick="document.getElementById('overdueModal').classList.add('hidden')">知道了</button>
+    </div>
+  </div>
+</div>
+
 <!-- Sidebar -->
 <div class="sidebar">
   <div class="logo">帳務<span>管理</span>系統<small>v2.0</small></div>
@@ -244,6 +310,10 @@ tr:hover td { background:var(--bg); }
     <button class="nav-btn" onclick="showTab('records')" id="nav-records">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       所有紀錄
+    </button>
+    <button class="nav-btn" onclick="showTab('report')" id="nav-report">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      報表圖表
     </button>
     <div class="nav-section">設定</div>
     <button class="nav-btn" onclick="showTab('gdrive')" id="nav-gdrive">
@@ -456,6 +526,25 @@ tr:hover td { background:var(--bg); }
         <input type="text" id="rec-search" placeholder="搜尋對象、名稱、類別..." oninput="renderAll()" style="flex:1;min-width:180px" />
       </div>
       <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>類型</th><th>對象</th><th>名稱</th><th>類別</th><th>金額</th><th>來源</th></tr></thead><tbody id="allTbody"></tbody></table></div>
+    </div>
+
+    <!-- 報表圖表 -->
+    <div id="tab-report" class="hidden">
+      <div class="form-box">
+        <div class="form-title">📊 近6個月收支趨勢</div>
+        <canvas id="barChart" height="220" style="width:100%;display:block"></canvas>
+        <div style="display:flex;gap:20px;justify-content:center;margin-top:10px;font-size:12px">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#0F6E56;border-radius:2px;display:inline-block"></span>入帳</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#993C1D;border-radius:2px;display:inline-block"></span>出帳</span>
+        </div>
+      </div>
+      <div class="form-box" style="margin-top:16px">
+        <div class="form-title">🥧 出帳類別佔比</div>
+        <div style="display:flex;align-items:center;gap:32px;flex-wrap:wrap">
+          <canvas id="pieChart" width="200" height="200" style="flex-shrink:0"></canvas>
+          <div id="pieLegend" style="flex:1;min-width:140px"></div>
+        </div>
+      </div>
     </div>
 
     <!-- Google Drive 同步 -->
