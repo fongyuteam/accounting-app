@@ -568,3 +568,33 @@ ipcMain.handle('google:revokeAuth', async () => {
 ipcMain.handle('updater:install', () => {
   autoUpdater.quitAndInstall();
 });
+
+// ── 備份資料庫 ──
+ipcMain.handle('db:backup', async () => {
+  const { filePath } = await dialog.showSaveDialog(mainWindow, {
+    title: '備份資料庫',
+    defaultPath: `帳務備份_${new Date().toISOString().split('T')[0]}.db`,
+    filters: [{ name: '資料庫備份', extensions: ['db'] }]
+  });
+  if (!filePath) return false;
+  fs.copyFileSync(getDataPath(), filePath);
+  shell.showItemInFolder(filePath);
+  return true;
+});
+
+// ── 還原資料庫 ──
+ipcMain.handle('db:restore', async () => {
+  const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: '選擇備份檔案還原',
+    filters: [{ name: '資料庫備份', extensions: ['db'] }],
+    properties: ['openFile']
+  });
+  if (!filePaths || !filePaths[0]) return false;
+  db.close();
+  fs.copyFileSync(filePaths[0], getDataPath());
+  // 重新開啟資料庫
+  const Database = require('better-sqlite3');
+  db = new Database(getDataPath());
+  db.exec("PRAGMA journal_mode=WAL;");
+  return true;
+});

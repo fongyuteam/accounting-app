@@ -444,11 +444,13 @@ async function delRecv(id) { if(!confirm('確定刪除？'))return; await window
 async function renderAll() {
   const tf=document.getElementById('rec-type')?.value||'all';
   const mf=document.getElementById('rec-month')?.value||'';
+  const kw=(document.getElementById('rec-search')?.value||'').trim().toLowerCase();
   const [inc,exp] = await Promise.all([window.api.income.getAll(),window.api.expense.getAll()]);
   let rows=[];
   if(tf!=='expense') inc.forEach(e=>rows.push({...e,_t:'income',_p:e.client}));
   if(tf!=='income') exp.forEach(e=>rows.push({...e,_t:'expense',_p:e.vendor}));
   if(mf) rows=rows.filter(r=>r.date.startsWith(mf));
+  if(kw) rows=rows.filter(r=>[r._p,r.title,r.category,r.note].some(v=>String(v||'').toLowerCase().includes(kw)));
   rows.sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('allTbody').innerHTML = rows.length ? rows.map(r=>`
     <tr><td>${r.date}</td>
@@ -480,6 +482,17 @@ async function updateSummary() {
 }
 
 async function exportCSV() { await window.api.export.csv(); }
+
+async function dbBackup() {
+  const ok = await window.api.db.backup();
+  if (ok) alert('備份完成！');
+}
+
+async function dbRestore() {
+  if (!confirm('還原後目前所有資料將被備份檔覆蓋，確定繼續？')) return;
+  const ok = await window.api.db.restore();
+  if (ok) { alert('還原成功，請重新整理頁面。'); location.reload(); }
+}
 
 // ── 客戶管理 ──
 async function importCustomersCSV() {

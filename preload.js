@@ -32,6 +32,10 @@ contextBridge.exposeInMainWorld('api', {
     autoAdd: (d) => ipcRenderer.invoke('customers:autoAdd', d)
   },
   export: { csv: () => ipcRenderer.invoke('export:csv') },
+  db: {
+    backup: () => ipcRenderer.invoke('db:backup'),
+    restore: () => ipcRenderer.invoke('db:restore')
+  },
   excel: {
     openDialog: () => ipcRenderer.invoke('excel:openDialog'),
     downloadTemplate: () => ipcRenderer.invoke('excel:downloadTemplate'),

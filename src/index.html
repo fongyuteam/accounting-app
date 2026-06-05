@@ -260,6 +260,14 @@ tr:hover td { background:var(--bg); }
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       匯出 CSV
     </button>
+    <button class="btn btn-sm" onclick="dbBackup()" style="width:100%;justify-content:center;margin-bottom:6px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v14a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      備份資料庫
+    </button>
+    <button class="btn btn-sm" onclick="dbRestore()" style="width:100%;justify-content:center">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      還原資料庫
+    </button>
   </div>
 </div>
 
@@ -445,6 +453,7 @@ tr:hover td { background:var(--bg); }
       <div class="filter-row">
         <select id="rec-type" onchange="renderAll()"><option value="all">全部類型</option><option value="income">入帳</option><option value="expense">出帳</option></select>
         <input type="month" id="rec-month" onchange="renderAll()" />
+        <input type="text" id="rec-search" placeholder="搜尋對象、名稱、類別..." oninput="renderAll()" style="flex:1;min-width:180px" />
       </div>
       <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>類型</th><th>對象</th><th>名稱</th><th>類別</th><th>金額</th><th>來源</th></tr></thead><tbody id="allTbody"></tbody></table></div>
     </div>
