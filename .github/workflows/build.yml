@@ -62,7 +62,7 @@ jobs:
         run: npm install
 
       - name: 給安裝腳本加執行權限
-        run: chmod +x scripts/雙擊安裝.command
+        run: chmod +x scripts/install.command
 
       - name: 打包 Mac 安裝檔
         run: npx electron-builder --mac --publish never
