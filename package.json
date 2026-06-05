@@ -1,6 +1,6 @@
 {
   "name": "accounting-app",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "公司帳務管理系統",
   "main": "main.js",
   "scripts": {

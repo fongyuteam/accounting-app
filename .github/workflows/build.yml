@@ -30,7 +30,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            dist/latest.yml
 
   build-mac:
     runs-on: macos-latest
@@ -55,7 +57,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mac-installer
-          path: dist/*.dmg
+          path: |
+            dist/*.dmg
+            dist/latest-mac.yml
 
   release:
     needs: [build-windows, build-mac]
@@ -80,7 +84,9 @@ jobs:
         with:
           files: |
             dist/win/*.exe
+            dist/win/latest.yml
             dist/mac/*.dmg
+            dist/mac/latest-mac.yml
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
