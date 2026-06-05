@@ -21,10 +21,7 @@ jobs:
         shell: bash
 
       - name: 安裝套件
-        run: npm install --ignore-scripts
-
-      - name: 重新編譯 better-sqlite3
-        run: npx electron-rebuild -f -w better-sqlite3
+        run: npm install
 
       - name: 打包 Windows 安裝檔
         run: npm run build-win
@@ -51,10 +48,7 @@ jobs:
         run: echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
 
       - name: 安裝套件
-        run: npm install --ignore-scripts
-
-      - name: 重新編譯 better-sqlite3
-        run: npx electron-rebuild -f -w better-sqlite3
+        run: npm install
 
       - name: 打包 Mac 安裝檔
         run: npm run build-mac
