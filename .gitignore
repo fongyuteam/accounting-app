@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/
+credentials.json
+data/google_token.json
+*.db
+.DS_Store
+Thumbs.db

@@ -1,0 +1,96 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'   # 推送 v2.1.0 這類 tag 時觸發
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 還原 credentials.json
+        run: echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
+        shell: bash
+
+      - name: 安裝套件
+        run: npm install --ignore-scripts
+
+      - name: 重新編譯 better-sqlite3
+        run: npx electron-rebuild -f -w better-sqlite3
+
+      - name: 打包 Windows 安裝檔
+        run: npm run build-win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上傳產物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/*.exe
+
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 還原 credentials.json
+        run: echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
+
+      - name: 安裝套件
+        run: npm install --ignore-scripts
+
+      - name: 重新編譯 better-sqlite3
+        run: npx electron-rebuild -f -w better-sqlite3
+
+      - name: 打包 Mac 安裝檔
+        run: npm run build-mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上傳產物
+        uses: actions/upload-artifact@v4
+        with:
+          name: mac-installer
+          path: dist/*.dmg
+
+  release:
+    needs: [build-windows, build-mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 下載 Windows 產物
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/win
+
+      - name: 下載 Mac 產物
+        uses: actions/download-artifact@v4
+        with:
+          name: mac-installer
+          path: dist/mac
+
+      - name: 發布 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/win/*.exe
+            dist/mac/*.dmg
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

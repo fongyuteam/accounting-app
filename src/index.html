@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8" />
+<title>帳務管理系統 v2</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #f5f5f3; --surface: #ffffff; --border: rgba(0,0,0,0.09); --border-md: rgba(0,0,0,0.14);
+  --text: #1a1a18; --muted: #6b6b67; --hint: #9b9b96;
+  --accent: #534AB7; --accent-bg: #EEEDFE; --accent-border: rgba(83,74,183,0.25);
+  --income: #0F6E56; --income-bg: #E1F5EE;
+  --expense: #993C1D; --expense-bg: #FAECE7;
+  --warn: #BA7517; --warn-bg: #FAEEDA;
+  --ok: #3B6D11; --ok-bg: #EAF3DE;
+  --danger: #A32D2D; --danger-bg: #FCEBEB;
+  --r: 8px; --r-lg: 12px; --sidebar: 210px;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#1a1a18; --surface:#242422; --border:rgba(255,255,255,0.08); --border-md:rgba(255,255,255,0.14);
+    --text:#f0f0ee; --muted:#9b9b96; --hint:#6b6b67;
+    --accent-bg:#26215C; --income-bg:#04342C; --expense-bg:#4A1B0C;
+    --warn-bg:#412402; --ok-bg:#173404; --danger-bg:#501313; }
+}
+body { font-family: -apple-system,'PingFang TC','Microsoft JhengHei',sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; overflow:hidden; font-size:14px; }
+
+/* Sidebar */
+.sidebar { width:var(--sidebar); background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+.logo { padding:18px 16px 14px; font-size:15px; font-weight:700; border-bottom:1px solid var(--border); }
+.logo span { color:var(--accent); }
+.logo small { display:block; font-size:10px; font-weight:400; color:var(--hint); margin-top:2px; }
+.nav { flex:1; padding:8px; overflow-y:auto; }
+.nav-section { font-size:10px; color:var(--hint); padding:10px 10px 4px; letter-spacing:0.8px; text-transform:uppercase; }
+.nav-btn { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:var(--r); cursor:pointer; color:var(--muted); font-size:13px; margin-bottom:1px; border:none; background:transparent; width:100%; text-align:left; }
+.nav-btn:hover { background:var(--bg); color:var(--text); }
+.nav-btn.active { background:var(--accent-bg); color:var(--accent); font-weight:500; }
+.nav-btn svg { width:15px; height:15px; flex-shrink:0; }
+.sidebar-foot { padding:10px; border-top:1px solid var(--border); }
+
+/* Main */
+.main { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+.topbar { padding:12px 24px; border-bottom:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; gap:12px; }
+.topbar h1 { font-size:15px; font-weight:600; white-space:nowrap; }
+.topbar-stats { display:flex; gap:14px; font-size:12px; flex-wrap:wrap; }
+.topbar-stats span { color:var(--muted); }
+.topbar-stats strong { font-size:13px; }
+.content { flex:1; overflow-y:auto; padding:20px 24px; }
+
+/* Summary */
+.summary { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
+.s-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:14px 16px; }
+.s-label { font-size:11px; color:var(--muted); margin-bottom:5px; }
+.s-val { font-size:20px; font-weight:600; }
+.s-val.inc { color:var(--income); } .s-val.exp { color:var(--expense); } .s-val.warn { color:var(--warn); }
+
+/* Form */
+.form-box { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:16px 20px; margin-bottom:18px; }
+.form-title { font-size:12px; font-weight:500; color:var(--muted); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.5px; }
+.fg { display:grid; gap:8px; margin-bottom:8px; }
+.fg.c2 { grid-template-columns:1fr 1fr; }
+.fg.c3 { grid-template-columns:1fr 1fr 1fr; }
+.fg.c4 { grid-template-columns:1fr 1fr 1fr 1fr; }
+.fg.c1 { grid-template-columns:1fr; }
+input,select,textarea { width:100%; padding:7px 10px; font-size:13px; border-radius:var(--r); border:1px solid var(--border-md); background:var(--bg); color:var(--text); font-family:inherit; }
+input:focus,select:focus,textarea:focus { outline:2px solid var(--accent); border-color:transparent; }
+textarea { resize:vertical; min-height:52px; }
+.fa { display:flex; justify-content:flex-end; margin-top:10px; gap:8px; }
+
+/* Buttons */
+.btn { padding:7px 14px; border-radius:var(--r); border:1px solid var(--border-md); background:var(--bg); cursor:pointer; font-size:13px; color:var(--text); font-family:inherit; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.btn:hover { background:var(--surface); }
+.btn-primary { background:var(--accent-bg); color:var(--accent); border-color:var(--accent-border); font-weight:500; }
+.btn-sm { padding:4px 10px; font-size:12px; }
+.btn-danger { color:var(--danger); border-color:rgba(163,45,45,0.3); }
+.btn-success { color:var(--ok); border-color:rgba(59,109,17,0.3); }
+.btn-excel { background:#EAF3DE; color:#3B6D11; border-color:rgba(59,109,17,0.3); font-weight:500; }
+.btn-ai { background:var(--accent-bg); color:var(--accent); border-color:var(--accent-border); font-weight:500; }
+
+/* Table */
+.tbl-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; padding:9px 13px; border-bottom:1px solid var(--border); color:var(--hint); font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; white-space:nowrap; }
+td { padding:10px 13px; border-bottom:1px solid var(--border); vertical-align:middle; }
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:var(--bg); }
+.empty-row td { text-align:center; padding:28px; color:var(--hint); }
+
+/* Badge */
+.badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:500; white-space:nowrap; }
+.b-inc { background:var(--income-bg); color:var(--income); }
+.b-exp { background:var(--expense-bg); color:var(--expense); }
+.b-paid { background:var(--ok-bg); color:var(--ok); }
+.b-pending { background:var(--warn-bg); color:var(--warn); }
+.b-overdue { background:var(--danger-bg); color:var(--danger); }
+.b-ai { background:var(--accent-bg); color:var(--accent); }
+.b-excel { background:var(--ok-bg); color:var(--ok); }
+.b-new { background:var(--warn-bg); color:var(--warn); }
+.b-manual { background:var(--bg); color:var(--muted); border:1px solid var(--border-md); }
+
+/* Filter */
+.filter-row { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+.filter-row select,.filter-row input[type=month] { width:auto; min-width:130px; }
+
+/* Upload zone */
+.upload-zone { border:2px dashed var(--border-md); border-radius:var(--r-lg); padding:28px; text-align:center; cursor:pointer; position:relative; transition:all 0.2s; }
+.upload-zone:hover { border-color:var(--accent); background:var(--accent-bg); }
+.upload-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.preview-img { max-width:100%; max-height:180px; border-radius:var(--r); border:1px solid var(--border); margin-top:10px; object-fit:contain; }
+.ai-box { background:var(--accent-bg); border:1px solid var(--accent-border); border-radius:var(--r-lg); padding:14px 18px; margin-top:14px; }
+.ai-box-title { font-size:12px; font-weight:500; color:var(--accent); margin-bottom:10px; }
+.ai-field { display:grid; grid-template-columns:90px 1fr; gap:8px; align-items:center; margin-bottom:7px; }
+.ai-field label { font-size:12px; color:var(--muted); }
+.spin { display:inline-block; width:13px; height:13px; border:2px solid var(--accent-border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.status-msg { font-size:12px; display:flex; align-items:center; gap:6px; margin-top:8px; padding:8px 12px; border-radius:var(--r); background:var(--surface); border:1px solid var(--border); }
+
+/* Excel preview */
+.excel-preview { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; margin-top:16px; }
+.excel-preview-header { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.excel-preview-header h3 { font-size:13px; font-weight:500; }
+.preview-row { display:grid; grid-template-columns:28px 70px 80px 1fr 1fr 90px 80px 80px 90px; gap:6px; padding:8px 12px; border-bottom:1px solid var(--border); font-size:12px; align-items:center; }
+.preview-row.header { background:var(--bg); font-weight:500; color:var(--muted); font-size:11px; text-transform:uppercase; }
+.preview-row:last-child { border-bottom:none; }
+.row-check { width:14px; height:14px; cursor:pointer; }
+.conf-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.conf-high { background:#3B6D11; } .conf-mid { background:#BA7517; } .conf-low { background:#A32D2D; }
+
+/* Customer card */
+.cust-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; margin-top:4px; }
+.cust-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:14px 16px; }
+.cust-name { font-size:14px; font-weight:600; margin-bottom:4px; }
+.cust-alias { font-size:11px; color:var(--muted); margin-bottom:8px; }
+.cust-meta { font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:3px; }
+.cust-actions { display:flex; gap:6px; margin-top:10px; }
+
+/* Modal */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center; z-index:200; }
+.modal { background:var(--surface); border-radius:var(--r-lg); padding:22px 24px; width:460px; border:1px solid var(--border); max-height:80vh; overflow-y:auto; }
+.modal h2 { font-size:15px; font-weight:600; margin-bottom:6px; }
+.modal p { font-size:13px; color:var(--muted); margin-bottom:14px; line-height:1.6; }
+.modal-foot { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+.hidden { display:none !important; }
+.divider { height:1px; background:var(--border); margin:16px 0; }
+.tag { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; background:var(--accent-bg); color:var(--accent); margin-right:4px; }
+.amount-pos { color:var(--income); font-weight:500; }
+.amount-neg { color:var(--expense); font-weight:500; }
+</style>
+</head>
+<body>
+
+<!-- 更新通知條 -->
+<div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accent);color:#fff;padding:10px 20px;display:none;align-items:center;justify-content:space-between;font-size:13px;">
+  <span id="update-msg">有新版本可用，正在背景下載...</span>
+  <button id="update-btn" onclick="window.updater && window.updater.install()" style="display:none;background:#fff;color:var(--accent);border:none;border-radius:6px;padding:4px 14px;cursor:pointer;font-weight:600;">立即重啟安裝</button>
+</div>
+
+<!-- API Key Modal 已移至拍照辨識頁面 -->
+
+<!-- Customer Edit Modal -->
+<div class="modal-overlay hidden" id="custModal">
+  <div class="modal">
+    <h2 id="custModalTitle">新增客戶</h2>
+    <input type="hidden" id="cust-edit-id" />
+    <div class="fg c1" style="margin-bottom:8px"><input type="text" id="cust-name" placeholder="客戶/廠商名稱（必填）" /></div>
+    <div class="fg c1" style="margin-bottom:8px"><input type="text" id="cust-aliases" placeholder="別名 / 簡稱（多個用逗號分隔，例：台積電,TSMC）" /></div>
+    <div class="fg c2" style="margin-bottom:8px">
+      <select id="cust-type">
+        <option value="income">入帳客戶（收款方）</option>
+        <option value="expense">出帳廠商（付款對象）</option>
+      </select>
+      <input type="text" id="cust-contact" placeholder="聯絡人" />
+    </div>
+    <div class="fg c2" style="margin-bottom:8px">
+      <input type="text" id="cust-category" placeholder="分類（例：科技業、物流）" />
+    </div>
+    <div class="fg c1"><textarea id="cust-note" placeholder="備註"></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeCustModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveCust()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 出帳編輯 Modal -->
+<div class="modal-overlay hidden" id="expEditModal">
+  <div class="modal">
+    <h2>編輯出帳紀錄</h2>
+    <input type="hidden" id="exp-edit-id" />
+    <div class="fg c2" style="margin-bottom:8px">
+      <input type="date" id="exp-edit-date" />
+      <input type="number" id="exp-edit-amount" placeholder="金額（元）" min="0" />
+    </div>
+    <div class="fg c1" style="margin-bottom:8px">
+      <input type="text" id="exp-edit-vendor" placeholder="廠商名稱" />
+    </div>
+    <div class="fg c2" style="margin-bottom:8px">
+      <input type="text" id="exp-edit-title" placeholder="支出名稱" />
+      <select id="exp-edit-cat" onchange="toggleCatCustom('exp-edit-cat','exp-edit-cat-custom')">
+        <option value="水電">水電</option>
+        <option value="租金">租金</option>
+        <option value="薪資">薪資</option>
+        <option value="設備">設備</option>
+        <option value="軟體訂閱">軟體訂閱</option>
+        <option value="行銷">行銷</option>
+        <option value="差旅">差旅</option>
+        <option value="其他">其他（自訂）</option>
+      </select>
+      <input type="text" id="exp-edit-cat-custom" placeholder="請輸入自訂類別" style="display:none;margin-top:4px"/>
+    </div>
+    <div class="fg c1"><textarea id="exp-edit-note" placeholder="備註"></textarea></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeExpEdit()">取消</button>
+      <button class="btn btn-primary" onclick="saveExpEdit()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="logo">帳務<span>管理</span>系統<small>v2.0</small></div>
+  <nav class="nav">
+    <div class="nav-section">AI 工具</div>
+    <button class="nav-btn active" onclick="showTab('scan')" id="nav-scan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      拍照辨識
+    </button>
+    <button class="nav-btn" onclick="showTab('excel')" id="nav-excel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Excel 匯入
+    </button>
+    <div class="nav-section">帳務</div>
+    <button class="nav-btn" onclick="showTab('clients')" id="nav-clients">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      客戶付款追蹤
+    </button>
+    <button class="nav-btn" onclick="showTab('income')" id="nav-income">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+      入帳管理
+    </button>
+    <button class="nav-btn" onclick="showTab('expense')" id="nav-expense">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="16 12 12 8 8 12"/><line x1="12" y1="16" x2="12" y2="8"/></svg>
+      出帳管理
+    </button>
+    <button class="nav-btn" onclick="showTab('records')" id="nav-records">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      所有紀錄
+    </button>
+    <div class="nav-section">設定</div>
+    <button class="nav-btn" onclick="showTab('gdrive')" id="nav-gdrive">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Google Drive 同步
+    </button>
+    <button class="nav-btn" onclick="showTab('customers')" id="nav-customers">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      客戶名單
+    </button>
+  </nav>
+  <div class="sidebar-foot">
+    <button class="btn btn-sm" onclick="exportCSV()" style="width:100%;justify-content:center;margin-bottom:6px">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      匯出 CSV
+    </button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <h1 id="pageTitle">拍照辨識</h1>
+    <div class="topbar-stats">
+      <span>入帳 <strong id="sb-inc" class="amount-pos">NT$0</strong></span>
+      <span>出帳 <strong id="sb-exp" class="amount-neg">NT$0</strong></span>
+      <span>淨收支 <strong id="sb-net">NT$0</strong></span>
+      <span>待收 <strong id="sb-pend" style="color:var(--warn)">NT$0</strong></span>
+    </div>
+  </div>
+  <div class="content">
+    <div class="summary" id="summaryCards"></div>
+
+    <!-- 拍照辨識 -->
+    <div id="tab-scan">
+      <!-- API Key 設定區 -->
+      <div class="form-box" id="apiKeyBox">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:2px">🔑 Anthropic API Key</div>
+            <div style="font-size:12px;color:var(--muted)" id="apiKeyStatus">尚未設定，AI 功能無法使用</div>
+          </div>
+          <button class="btn btn-sm" onclick="toggleApiForm()" id="apiToggleBtn">設定 API Key</button>
+        </div>
+        <div id="apiKeyForm" class="hidden" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">前往 <strong>console.anthropic.com</strong> 取得 API Key，金鑰只存在本機電腦。</div>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="flex:1" />
+            <button class="btn btn-primary" onclick="saveApi()">儲存</button>
+            <button class="btn btn-danger btn-sm" onclick="clearApi()" id="clearApiBtn" style="display:none">清除</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-box">
+        <div class="form-title">📸 上傳單據，AI 自動辨識</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="openCamera()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            開啟鏡頭拍照
+          </button>
+          <div style="position:relative;flex:1;min-width:200px">
+            <div class="upload-zone" style="padding:12px">
+              <input type="file" accept="image/*" id="fileInput" onchange="handleFile(event)" />
+              <p style="color:var(--muted);font-size:13px">📂 點擊選擇圖片 或 拖曳至此</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 鏡頭區域 -->
+        <div id="cameraArea" style="display:none;margin-bottom:12px">
+          <div style="position:relative;background:#000;border-radius:var(--r-lg);overflow:hidden;max-width:100%">
+            <video id="cameraVideo" autoplay playsinline style="width:100%;max-height:320px;display:block;object-fit:cover"></video>
+            <div style="position:absolute;bottom:12px;left:0;right:0;display:flex;justify-content:center;gap:12px">
+              <button class="btn" onclick="closeCamera()" style="background:rgba(0,0,0,0.6);color:white;border-color:rgba(255,255,255,0.3)">取消</button>
+              <button class="btn btn-primary" onclick="takePhoto()" style="padding:10px 24px;font-size:14px">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                拍照
+              </button>
+            </div>
+          </div>
+          <canvas id="cameraCanvas" style="display:none"></canvas>
+        </div>
+
+        <div id="previewArea"></div>
+        <div id="aiStatus"></div>
+        <div id="aiResultArea"></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">🕐 最近 AI 辨識紀錄</div>
+      <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>類型</th><th>對象</th><th>名稱</th><th>金額</th><th>類別</th></tr></thead><tbody id="aiHistTbody"></tbody></table></div>
+    </div>
+
+    <!-- Excel 匯入 -->
+    <div id="tab-excel" class="hidden">
+      <!-- 方式一：下載範本 -->
+      <div class="form-box">
+        <div class="form-title">📥 步驟一：下載填寫範本</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+          下載 Excel 範本，依照格式填好入帳、出帳、應收帳款資料後，再上傳匯入。<br>
+          範本內有範例資料說明格式，填完後刪掉範例即可。
+        </p>
+        <button class="btn btn-excel" onclick="downloadTemplate()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          下載 Excel 範本
+        </button>
+        <div style="margin-top:12px;font-size:12px;color:var(--hint);line-height:1.8">
+          範本包含三個工作表：<strong style="color:var(--income)">入帳</strong>、<strong style="color:var(--expense)">出帳</strong>、<strong style="color:var(--warn)">應收帳款</strong><br>
+          類別可填：服務費／產品銷售／顧問費／維護費／租金／薪資／設備／軟體訂閱／行銷／差旅／水電／其他<br>
+          付款狀態填：已付款 或 待付款
+        </div>
+      </div>
+
+      <!-- 方式二：上傳匯入 -->
+      <div class="form-box">
+        <div class="form-title">📤 步驟二：上傳匯入（不需要 API Key）</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+          填好範本後，點下方按鈕上傳，系統會自動讀取三個工作表並匯入。
+        </p>
+        <button class="btn btn-primary" onclick="importTemplate()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          選擇並匯入 Excel
+        </button>
+        <div id="importStatus"></div>
+      </div>
+
+      <!-- 方式三：AI 智慧匯入（需要 API Key）-->
+      <div class="form-box">
+        <div class="form-title">✦ 進階：AI 智慧匯入（需要 API Key）</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+          如果你的 Excel 格式不固定，可以用 AI 自動判斷欄位、比對客戶名單。
+        </p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-excel" onclick="openExcel()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            選擇 Excel 檔案
+          </button>
+          <button class="btn btn-ai hidden" id="btnAnalyze" onclick="analyzeExcel()">
+            ✦ AI 分析資料
+          </button>
+        </div>
+        <div id="excelStatus"></div>
+        <div id="excelPreview"></div>
+        <div id="excelImportBtn"></div>
+      </div>
+    </div>
+
+    <!-- 入帳 -->
+    <div id="tab-income" class="hidden">
+      <div class="form-box">
+        <div class="form-title">＋ 新增入帳</div>
+        <div class="fg c3"><input type="date" id="in-date"/><input type="text" id="in-client" placeholder="客戶名稱"/><input type="number" id="in-amount" placeholder="金額（元）" min="0"/></div>
+        <div class="fg c2"><input type="text" id="in-title" placeholder="款項名稱"/><div style="display:flex;flex-direction:column;gap:4px"><select id="in-cat" onchange="toggleCatCustom('in-cat','in-cat-custom')"><option value="服務費">服務費</option><option value="產品銷售">產品銷售</option><option value="顧問費">顧問費</option><option value="維護費">維護費</option><option value="其他">其他（自訂）</option></select><input type="text" id="in-cat-custom" placeholder="請輸入自訂類別" style="display:none"/></div></div>
+        <div class="fg c1"><textarea id="in-note" placeholder="備註（選填）"></textarea></div>
+        <div class="fa"><button class="btn btn-primary" onclick="addIncome()">✓ 新增入帳</button></div>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>客戶</th><th>款項名稱</th><th>類別</th><th>金額</th><th>備註</th><th>來源</th><th></th></tr></thead><tbody id="incTbody"></tbody></table></div>
+    </div>
+
+    <!-- 出帳 -->
+    <div id="tab-expense" class="hidden">
+      <div class="form-box">
+        <div class="form-title">＋ 新增出帳</div>
+        <div class="fg c3"><input type="date" id="ex-date"/><input type="text" id="ex-vendor" placeholder="廠商 / 受款方"/><input type="number" id="ex-amount" placeholder="金額（元）" min="0"/></div>
+        <div class="fg c2"><input type="text" id="ex-title" placeholder="支出名稱"/><div style="display:flex;flex-direction:column;gap:4px"><select id="ex-cat" onchange="toggleCatCustom('ex-cat','ex-cat-custom')"><option value="租金">租金</option><option value="薪資">薪資</option><option value="設備">設備</option><option value="軟體訂閱">軟體訂閱</option><option value="行銷">行銷</option><option value="差旅">差旅</option><option value="水電">水電</option><option value="其他">其他（自訂）</option></select><input type="text" id="ex-cat-custom" placeholder="請輸入自訂類別" style="display:none"/></div></div>
+        <div class="fg c1"><textarea id="ex-note" placeholder="備註（選填）"></textarea></div>
+        <div class="fa"><button class="btn btn-primary" onclick="addExpense()">✓ 新增出帳</button></div>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>廠商</th><th>支出名稱</th><th>類別</th><th>金額</th><th>備註</th><th>來源</th><th></th></tr></thead><tbody id="expTbody"></tbody></table></div>
+    </div>
+
+    <!-- 客戶付款追蹤 -->
+    <div id="tab-clients" class="hidden">
+      <!-- CSV 匯入區 -->
+      <div class="form-box" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+        <div>
+          <div style="font-size:14px;font-weight:500;margin-bottom:2px">📥 從 CSV 匯入應收帳款</div>
+          <div style="font-size:12px;color:var(--muted)">每個月上傳請款單 zip 給 Claude 後，下載整理好的 CSV 直接匯入</div>
+        </div>
+        <button class="btn btn-excel" onclick="importReceivablesCSV()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          選擇 CSV 匯入
+        </button>
+      </div>
+      <div id="csvImportStatus"></div>
+
+      <div class="form-box">
+        <div class="form-title">＋ 手動新增應收帳款（確認付款後自動同步至入帳管理）</div>
+        <div class="fg c3"><input type="date" id="cl-issue"/><input type="date" id="cl-due"/><input type="number" id="cl-amount" placeholder="金額（元）"/></div>
+        <div class="fg c2"><input type="text" id="cl-client" placeholder="客戶名稱"/><input type="text" id="cl-inv" placeholder="發票 / 單號（選填）"/></div>
+        <div class="fg c1"><input type="text" id="cl-desc" placeholder="說明"/></div>
+        <div class="fa"><button class="btn btn-primary" onclick="addReceivable()">✓ 新增應收帳款</button></div>
+      </div>
+      <div class="filter-row"><select id="cl-filter" onchange="renderReceivables()"><option value="all">全部狀態</option><option value="pending">待付款</option><option value="overdue">已逾期</option><option value="paid">已付款</option></select></div>
+      <div class="tbl-wrap"><table><thead><tr><th>開立日期</th><th>應付日期</th><th>客戶</th><th>說明</th><th>單號</th><th>金額</th><th>狀態</th><th>操作</th></tr></thead><tbody id="recvTbody"></tbody></table></div>
+    </div>
+
+    <!-- 所有紀錄 -->
+    <div id="tab-records" class="hidden">
+      <div class="filter-row">
+        <select id="rec-type" onchange="renderAll()"><option value="all">全部類型</option><option value="income">入帳</option><option value="expense">出帳</option></select>
+        <input type="month" id="rec-month" onchange="renderAll()" />
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>類型</th><th>對象</th><th>名稱</th><th>類別</th><th>金額</th><th>來源</th></tr></thead><tbody id="allTbody"></tbody></table></div>
+    </div>
+
+    <!-- Google Drive 同步 -->
+    <div id="tab-gdrive" class="hidden">
+      <div class="form-box">
+        <div class="form-title">🔗 Google 帳號授權</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+          <div id="gAuthStatus" style="font-size:13px;color:var(--muted)">檢查中...</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary" id="gAuthBtn" onclick="googleAuthorize()">登入 Google 帳號</button>
+            <button class="btn btn-danger btn-sm hidden" id="gRevokeBtn" onclick="googleRevoke()">取消授權</button>
+          </div>
+        </div>
+        <div style="font-size:12px;color:var(--hint);line-height:1.8">
+          授權後程式可以讀取你的「豐裕請款單」資料夾，自動抓取請款資料。<br>
+          請確認 <strong>credentials.json</strong> 已放在程式資料夾（win-unpacked）內。
+        </div>
+      </div>
+
+      <div class="form-box">
+        <div class="form-title">📂 從 Google Drive 抓取請款單</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7">
+          選擇要抓取的月份，程式會自動掃描「豐裕請款單」資料夾內所有請款單，<br>
+          抓取客戶名稱、計費期間、總金額（含稅），整理後讓你確認匯入。
+        </p>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+          <div style="font-size:13px;font-weight:500;white-space:nowrap">抓取年份：</div>
+          <select id="sel-year" style="width:110px" onchange="updateMonthOptions()">
+            <option value="130">民國 130 年</option>
+            <option value="129">民國 129 年</option>
+            <option value="128">民國 128 年</option>
+            <option value="127">民國 127 年</option>
+            <option value="126">民國 126 年</option>
+            <option value="125">民國 125 年</option>
+            <option value="124">民國 124 年</option>
+            <option value="123">民國 123 年</option>
+            <option value="122">民國 122 年</option>
+            <option value="121">民國 121 年</option>
+            <option value="120">民國 120 年</option>
+            <option value="119">民國 119 年</option>
+            <option value="118">民國 118 年</option>
+            <option value="117">民國 117 年</option>
+            <option value="116">民國 116 年</option>
+            <option value="115" selected>民國 115 年</option>
+            <option value="114">民國 114 年</option>
+            <option value="113">民國 113 年</option>
+            <option value="112">民國 112 年</option>
+          </select>
+          <div style="font-size:13px;font-weight:500;white-space:nowrap">月份：</div>
+          <div id="monthCheckboxes" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+          <button class="btn btn-sm" onclick="selectAllMonths(true)">全選</button>
+          <button class="btn btn-sm" onclick="selectAllMonths(false)">清除</button>
+        </div>
+        <button class="btn btn-primary" id="gFetchBtn" onclick="googleFetch()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.71"/></svg>
+          開始抓取
+        </button>
+        <div id="gFetchStatus"></div>
+        <div id="gFetchPreview"></div>
+        <div id="gFetchImportBtn"></div>
+      </div>
+    </div>
+
+    <!-- 客戶名單 -->
+    <div id="tab-customers" class="hidden">
+      <div class="form-box" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-size:14px;font-weight:500;margin-bottom:2px">客戶名單管理</div>
+          <div style="font-size:12px;color:var(--muted)">建立客戶資料後，Excel 匯入時 AI 可自動比對識別</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-excel" onclick="importCustomersCSV()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            從 CSV 匯入客戶
+          </button>
+          <button class="btn btn-primary" onclick="openAddCust()">＋ 新增客戶</button>
+        </div>
+      </div>
+      <div id="custImportStatus"></div>
+      <div class="cust-grid" id="custGrid"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="renderer.js"></script>
+<!-- 隱藏檔案選擇器（Web 版用） -->
+<input type="file" id="_excelInput"   accept=".xlsx,.xls,.csv" style="display:none">
+<input type="file" id="_templateInput" accept=".xlsx,.xls"     style="display:none">
+<input type="file" id="_csvRecvInput"  accept=".csv"           style="display:none">
+<input type="file" id="_csvCustInput"  accept=".csv"           style="display:none">
+<script>
+if (window.updater) {
+  window.updater.onUpdateAvailable(() => {
+    const bar = document.getElementById('update-bar');
+    bar.style.display = 'flex';
+  });
+  window.updater.onUpdateDownloaded(() => {
+    document.getElementById('update-msg').textContent = '新版本已下載完成，重啟後即可更新';
+    document.getElementById('update-btn').style.display = 'inline-block';
+  });
+}
+</script>
+</body>
+</html>
