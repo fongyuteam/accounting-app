@@ -32,6 +32,10 @@ jobs:
           path: ~\AppData\Local\electron\Cache
           key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
 
+      - name: 安裝 Python setuptools (node-gyp 需要)
+        run: pip install setuptools
+        shell: bash
+
       - name: 安裝套件
         run: npm install
 
@@ -69,6 +73,9 @@ jobs:
         with:
           path: ~/Library/Caches/electron
           key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      - name: 安裝 Python setuptools (node-gyp 需要)
+        run: pip install setuptools
 
       - name: 安裝套件
         run: npm install
