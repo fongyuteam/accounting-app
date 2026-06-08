@@ -26,6 +26,12 @@ jobs:
         run: echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
         shell: bash
 
+      - name: 快取 Electron 下載
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\electron\Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
+
       - name: 安裝套件
         run: npm install
 
@@ -58,14 +64,17 @@ jobs:
       - name: 還原 credentials.json
         run: echo '${{ secrets.CREDENTIALS_JSON }}' > credentials.json
 
+      - name: 快取 Electron 下載
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
+
       - name: 安裝套件
         run: npm install
 
       - name: 給安裝腳本加執行權限
         run: chmod +x scripts/install.command
-
-      - name: 修正 app-builder 執行權限
-        run: chmod +x node_modules/app-builder-bin/mac/app-builder_arm64 || true
 
       - name: 打包 Mac 安裝檔
         run: npx electron-builder --mac --publish never
