@@ -64,6 +64,9 @@ jobs:
       - name: 給安裝腳本加執行權限
         run: chmod +x scripts/install.command
 
+      - name: 修正 app-builder 執行權限
+        run: chmod +x node_modules/app-builder-bin/mac/app-builder_arm64 || true
+
       - name: 打包 Mac 安裝檔
         run: npx electron-builder --mac --publish never
 
