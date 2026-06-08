@@ -1,5 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
-const { autoUpdater } = require('electron-updater');
+// electron-updater 不再使用，改為手動引導下載
 const path = require('path');
 const fs = require('fs');
 
@@ -90,7 +90,7 @@ function createWindow() {
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-function checkLatestVersionMac() {
+function checkLatestVersion() {
   const https = require('https');
   const currentVersion = app.getVersion();
   const req = https.request({
@@ -108,6 +108,7 @@ function checkLatestVersionMac() {
         if (latestVersion && latestVersion !== currentVersion) {
           mainWindow?.webContents.send('update-available-mac', latestVersion, release.html_url);
         }
+        // 版本相同，不做任何事
       } catch(e) {}
     });
   });
@@ -120,19 +121,8 @@ app.whenReady().then(() => {
   createWindow();
   // 安裝版才啟動自動更新
   if (app.isPackaged) {
-    if (process.platform === 'darwin') {
-      // Mac：手動檢查 GitHub 最新版本，提示用戶下載
-      checkLatestVersionMac();
-    } else {
-      // Windows：完整自動更新
-      autoUpdater.checkForUpdatesAndNotify();
-      autoUpdater.on('update-available', () => {
-        mainWindow?.webContents.send('update-available');
-      });
-      autoUpdater.on('update-downloaded', () => {
-        mainWindow?.webContents.send('update-downloaded');
-      });
-    }
+    // Windows 和 Mac 都改為手動引導下載
+    checkLatestVersion();
   }
 });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
@@ -605,10 +595,8 @@ ipcMain.handle('google:revokeAuth', async () => {
   } catch(e) { return { success: false }; }
 });
 
-// ── 自動更新 ──
-ipcMain.handle('updater:install', () => {
-  autoUpdater.quitAndInstall();
-});
+// ── 自動更新（已改為引導下載，此 handler 保留相容性）──
+ipcMain.handle('updater:install', () => {});
 
 // ── 備份資料庫 ──
 ipcMain.handle('db:backup', async () => {

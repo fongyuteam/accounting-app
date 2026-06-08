@@ -641,23 +641,13 @@ tr:hover td { background:var(--bg); }
 <input type="file" id="_csvCustInput"  accept=".csv"           style="display:none">
 <script>
 if (window.updater) {
-  // Windows：自動下載更新
-  window.updater.onUpdateAvailable(() => {
-    document.getElementById('update-bar').style.display = 'flex';
-  });
-  window.updater.onUpdateDownloaded(() => {
-    document.getElementById('update-msg').textContent = '新版本已下載完成，重啟後即可更新';
-    document.getElementById('update-btn').style.display = 'inline-block';
-    document.getElementById('update-dl-btn').style.display = 'inline-block';
-  });
-  // Mac：提示手動下載
+  // Windows 和 Mac 統一：有新版本就提示引導下載
   window.updater.onUpdateAvailableMac((_, version, url) => {
     document.getElementById('update-msg').textContent = `有新版本 ${version} 可用`;
     const btn = document.getElementById('update-btn');
     btn.textContent = '前往下載';
     btn.onclick = () => window.open(url, '_blank');
     btn.style.display = 'inline-block';
-    document.getElementById('update-dl-btn').style.display = 'inline-block';
     document.getElementById('update-bar').style.display = 'flex';
   });
 }
