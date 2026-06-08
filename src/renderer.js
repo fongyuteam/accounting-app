@@ -20,6 +20,42 @@ function getCatVal(selectId, inputId) {
   return sel ? sel.value : '其他';
 }
 
+// ── 自訂類別管理（分入帳/出帳，存 localStorage）──
+function getCustomCats(type) {
+  try { return JSON.parse(localStorage.getItem('customCats_' + type) || '[]'); } catch { return []; }
+}
+function saveCustomCat(type, cat) {
+  if (!cat || cat === '其他') return;
+  const cats = getCustomCats(type);
+  if (cats.includes(cat)) return;
+  cats.push(cat);
+  localStorage.setItem('customCats_' + type, JSON.stringify(cats));
+  appendCatOption(type, cat);
+}
+function appendCatOption(type, cat) {
+  // 入帳的 select ids
+  const incSelIds = ['in-cat', 'inc-edit-cat'];
+  // 出帳的 select ids
+  const expSelIds = ['ex-cat', 'exp-edit-cat'];
+  const ids = type === 'income' ? incSelIds : expSelIds;
+  ids.forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    if ([...sel.options].some(o => o.value === cat)) return;
+    const opt = document.createElement('option');
+    opt.value = cat; opt.textContent = cat;
+    // 插在「其他（自訂）」之前
+    const otherOpt = [...sel.options].find(o => o.value === '其他');
+    if (otherOpt) sel.insertBefore(opt, otherOpt);
+    else sel.appendChild(opt);
+  });
+}
+function loadCustomCats() {
+  ['income', 'expense'].forEach(type => {
+    getCustomCats(type).forEach(cat => appendCatOption(type, cat));
+  });
+}
+
 // ── Web API（替換 Electron preload）──
 function _b64(buf) {
   let bin = '';
@@ -181,6 +217,7 @@ function showTab(name) {
 }
 
 async function loadAll() {
+  loadCustomCats();
   await Promise.all([renderIncome(), renderExpense(), renderReceivables(), renderAiHist(), renderCustomers()]);
   updateSummary();
   checkOverdue();
@@ -238,6 +275,7 @@ async function saveIncEdit() {
   const amount = parseFloat(document.getElementById('inc-edit-amount').value);
   const note = document.getElementById('inc-edit-note').value.trim();
   const category = getCatVal('inc-edit-cat','inc-edit-cat-custom');
+  saveCustomCat('income', category);
   if (!date||!client||!title||!amount) { alert('請填寫所有必填欄位'); return; }
   await window.api.income.update({id,date,client,title,category,amount,note});
   closeIncEdit(); await renderIncome();
@@ -246,7 +284,9 @@ async function saveIncEdit() {
 async function addIncome() {
   const d=v('in-date'),client=v('in-client'),amount=parseFloat(v('in-amount')),title=v('in-title');
   if(!d||!client||!amount||!title){alert('請填寫日期、客戶、款項名稱和金額');return;}
-  await window.api.income.add({date:d,client,amount,title,category:getCatVal('in-cat','in-cat-custom'),note:v('in-note'),source:'manual'});
+  const inCat = getCatVal('in-cat','in-cat-custom');
+  saveCustomCat('income', inCat);
+  await window.api.income.add({date:d,client,amount,title,category:inCat,note:v('in-note'),source:'manual'});
   await window.api.customers.autoAdd({name:client, type:'income'});
   ['in-client','in-amount','in-title','in-note'].forEach(clr);
   const inCatCustom = document.getElementById('in-cat-custom');
@@ -314,6 +354,7 @@ async function saveExpEdit() {
   const title = document.getElementById('exp-edit-title').value.trim();
   const amount = parseFloat(document.getElementById('exp-edit-amount').value);
   const category = getCatVal('exp-edit-cat', 'exp-edit-cat-custom');
+  saveCustomCat('expense', category);
   const note = document.getElementById('exp-edit-note').value.trim();
 
   if (!date || !vendor || !amount) { alert('請填寫日期、廠商和金額'); return; }
@@ -327,7 +368,9 @@ async function saveExpEdit() {
 async function addExpense() {
   const d=v('ex-date'),vendor=v('ex-vendor'),amount=parseFloat(v('ex-amount')),title=v('ex-title');
   if(!d||!vendor||!amount||!title){alert('請填寫日期、廠商、支出名稱和金額');return;}
-  await window.api.expense.add({date:d,vendor,amount,title,category:getCatVal('ex-cat','ex-cat-custom'),note:v('ex-note'),source:'manual'});
+  const exCat = getCatVal('ex-cat','ex-cat-custom');
+  saveCustomCat('expense', exCat);
+  await window.api.expense.add({date:d,vendor,amount,title,category:exCat,note:v('ex-note'),source:'manual'});
   await window.api.customers.autoAdd({name:vendor, type:'expense'});
   ['ex-vendor','ex-amount','ex-title','ex-note'].forEach(clr);
   const exCatCustom = document.getElementById('ex-cat-custom');
