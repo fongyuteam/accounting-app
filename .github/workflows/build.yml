@@ -16,6 +16,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: 安裝 Python 3.11 (node-gyp 需要)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: 從 tag 設定版本號
         run: |
           VERSION=${GITHUB_REF_NAME#v}
@@ -31,10 +36,6 @@ jobs:
         with:
           path: ~\AppData\Local\electron\Cache
           key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
-
-      - name: 安裝 Python setuptools (node-gyp 需要)
-        run: pip install setuptools
-        shell: bash
 
       - name: 安裝套件
         run: npm install
@@ -60,6 +61,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: 安裝 Python 3.11 (node-gyp 需要)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: 從 tag 設定版本號
         run: |
           VERSION=${GITHUB_REF_NAME#v}
@@ -73,9 +79,6 @@ jobs:
         with:
           path: ~/Library/Caches/electron
           key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
-
-      - name: 安裝 Python setuptools (node-gyp 需要)
-        run: pip install setuptools
 
       - name: 安裝套件
         run: npm install
