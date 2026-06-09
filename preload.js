@@ -39,6 +39,10 @@ contextBridge.exposeInMainWorld('api', {
     backup: () => ipcRenderer.invoke('db:backup'),
     restore: () => ipcRenderer.invoke('db:restore')
   },
+  customCats: {
+    getAll: (type) => ipcRenderer.invoke('customCats:getAll', type),
+    add: (type, name) => ipcRenderer.invoke('customCats:add', type, name)
+  },
   excel: {
     openDialog: () => ipcRenderer.invoke('excel:openDialog'),
     downloadTemplate: () => ipcRenderer.invoke('excel:downloadTemplate'),

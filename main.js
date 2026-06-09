@@ -54,6 +54,12 @@ function initDatabase() {
         note TEXT DEFAULT '',
         created_at TEXT DEFAULT (datetime('now'))
       );
+      CREATE TABLE IF NOT EXISTS custom_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        name TEXT NOT NULL,
+        UNIQUE(type, name)
+      );
       -- 舊版資料庫自動補上 type 欄位
       PRAGMA journal_mode=WAL;
     `);
@@ -597,6 +603,15 @@ ipcMain.handle('google:revokeAuth', async () => {
 
 // ── 自動更新（已改為引導下載，此 handler 保留相容性）──
 ipcMain.handle('updater:install', () => {});
+
+// ── 自訂類別 ──
+ipcMain.handle('customCats:getAll', (_, type) =>
+  db.prepare('SELECT name FROM custom_categories WHERE type=? ORDER BY id ASC').all(type).map(r => r.name)
+);
+ipcMain.handle('customCats:add', (_, type, name) => {
+  try { db.prepare('INSERT OR IGNORE INTO custom_categories (type, name) VALUES (?,?)').run(type, name); } catch(e) {}
+  return true;
+});
 
 // ── 備份資料庫 ──
 ipcMain.handle('db:backup', async () => {

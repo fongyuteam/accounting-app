@@ -52,22 +52,14 @@ function getCatVal(selectId, inputId) {
   return sel ? sel.value : '其他';
 }
 
-// ── 自訂類別管理（分入帳/出帳，存 localStorage）──
-function getCustomCats(type) {
-  try { return JSON.parse(localStorage.getItem('customCats_' + type) || '[]'); } catch { return []; }
-}
-function saveCustomCat(type, cat) {
+// ── 自訂類別管理（分入帳/出帳，存資料庫）──
+async function saveCustomCat(type, cat) {
   if (!cat || cat === '其他') return;
-  const cats = getCustomCats(type);
-  if (cats.includes(cat)) return;
-  cats.push(cat);
-  localStorage.setItem('customCats_' + type, JSON.stringify(cats));
+  await window.api.customCats.add(type, cat);
   appendCatOption(type, cat);
 }
 function appendCatOption(type, cat) {
-  // 入帳的 select ids
   const incSelIds = ['in-cat', 'inc-edit-cat'];
-  // 出帳的 select ids
   const expSelIds = ['ex-cat', 'exp-edit-cat'];
   const ids = type === 'income' ? incSelIds : expSelIds;
   ids.forEach(id => {
@@ -76,16 +68,16 @@ function appendCatOption(type, cat) {
     if ([...sel.options].some(o => o.value === cat)) return;
     const opt = document.createElement('option');
     opt.value = cat; opt.textContent = cat;
-    // 插在「其他（自訂）」之前
     const otherOpt = [...sel.options].find(o => o.value === '其他');
     if (otherOpt) sel.insertBefore(opt, otherOpt);
     else sel.appendChild(opt);
   });
 }
-function loadCustomCats() {
-  ['income', 'expense'].forEach(type => {
-    getCustomCats(type).forEach(cat => appendCatOption(type, cat));
-  });
+async function loadCustomCats() {
+  for (const type of ['income', 'expense']) {
+    const cats = await window.api.customCats.getAll(type);
+    cats.forEach(cat => appendCatOption(type, cat));
+  }
 }
 
 // ── Web API（替換 Electron preload）──
@@ -249,7 +241,7 @@ function showTab(name) {
 }
 
 async function loadAll() {
-  loadCustomCats();
+  await loadCustomCats();
   await Promise.all([renderIncome(), renderExpense(), renderReceivables(), renderAiHist(), renderCustomers()]);
   updateSummary();
   checkOverdue();
