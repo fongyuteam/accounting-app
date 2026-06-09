@@ -187,7 +187,15 @@ async function downloadAndParse(drive, file, targetMonths, twYear) {
 
       if (!month) continue;
 
-      const dueDate = twToDate(invoiceDate || '');
+      // 應付日期 = 請款日期當月月底（例：6/5 → 6/30）
+      const invoiceDateStr = twToDate(invoiceDate || '');
+      function getEndOfSameMonth(dateStr) {
+        const d = new Date(dateStr);
+        if (isNaN(d)) return dateStr;
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+      }
+      const dueDate = invoiceDateStr ? getEndOfSameMonth(invoiceDateStr) : '';
       const issueRaw = matchedPeriod ? matchedPeriod.split('-')[0] : (invoiceDate || '');
       const issueDate = twToDate(issueRaw);
 
