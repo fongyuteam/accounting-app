@@ -37,6 +37,10 @@ jobs:
           path: ~\AppData\Local\electron\Cache
           key: electron-${{ runner.os }}-${{ hashFiles('package.json') }}
 
+      - name: 設定 Windows 編譯工具版本
+        run: npm config set msvs_version 2022
+        shell: bash
+
       - name: 安裝套件
         run: npm install
 
