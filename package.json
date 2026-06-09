@@ -73,7 +73,7 @@
       "!*.md",
       "!server.js",
       "!google-auth-web.js",
-      "!start.bat",
+      "!start.bat"
     ]
   }
 }
