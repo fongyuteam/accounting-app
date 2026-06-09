@@ -214,7 +214,7 @@ function saveApi() {
   updateApiKeyUI();
 }
 
-function clearApi() {
+async function clearApi() {
   if (!await confirmDialog('確定要清除 API Key？')) return;
   apiKey = ''; localStorage.removeItem('anthropic_api_key');
   document.getElementById('apiKeyInput').value = '';
