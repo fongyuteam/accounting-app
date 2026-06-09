@@ -4,6 +4,38 @@ let apiKey = localStorage.getItem('anthropic_api_key') || '';
 let excelRows = null;
 let analyzedRows = null;
 
+// ── Toast 通知（取代 alert 避免 Electron 失焦問題）──
+let _toastTimer;
+function toast(msg, isError = false) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  clearTimeout(_toastTimer);
+  el.textContent = msg;
+  el.className = 'show' + (isError ? ' error' : '');
+  _toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+
+// ── 自訂確認對話框（取代 confirm 避免 Electron 失焦問題）──
+function confirmDialog(msg) {
+  return new Promise(resolve => {
+    const modal = document.getElementById('confirmModal');
+    document.getElementById('confirmMsg').textContent = msg;
+    modal.classList.remove('hidden');
+    const ok = document.getElementById('confirmOk');
+    const cancel = document.getElementById('confirmCancel');
+    function cleanup(result) {
+      modal.classList.add('hidden');
+      ok.removeEventListener('click', onOk);
+      cancel.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onOk() { cleanup(true); }
+    function onCancel() { cleanup(false); }
+    ok.addEventListener('click', onOk);
+    cancel.addEventListener('click', onCancel);
+  });
+}
+
 // ── 類別自訂輸入 helper ──
 function toggleCatCustom(selectId, inputId) {
   const sel = document.getElementById(selectId);
@@ -184,14 +216,14 @@ function toggleApiForm() {
 
 function saveApi() {
   const k = document.getElementById('apiKeyInput').value.trim();
-  if (!k.startsWith('sk-ant-')) { alert('格式不正確，應以 sk-ant- 開頭'); return; }
+  if (!k.startsWith('sk-ant-')) { toast('格式不正確，應以 sk-ant- 開頭', true); return; }
   apiKey = k; localStorage.setItem('anthropic_api_key', k);
   document.getElementById('apiKeyForm').classList.add('hidden');
   updateApiKeyUI();
 }
 
 function clearApi() {
-  if (!confirm('確定要清除 API Key？')) return;
+  if (!await confirmDialog('確定要清除 API Key？')) return;
   apiKey = ''; localStorage.removeItem('anthropic_api_key');
   document.getElementById('apiKeyInput').value = '';
   document.getElementById('apiKeyForm').classList.add('hidden');
@@ -276,14 +308,14 @@ async function saveIncEdit() {
   const note = document.getElementById('inc-edit-note').value.trim();
   const category = getCatVal('inc-edit-cat','inc-edit-cat-custom');
   saveCustomCat('income', category);
-  if (!date||!client||!title||!amount) { alert('請填寫所有必填欄位'); return; }
+  if (!date||!client||!title||!amount) { toast('請填寫所有必填欄位', true); return; }
   await window.api.income.update({id,date,client,title,category,amount,note});
   closeIncEdit(); await renderIncome();
 }
 
 async function addIncome() {
   const d=v('in-date'),client=v('in-client'),amount=parseFloat(v('in-amount')),title=v('in-title');
-  if(!d||!client||!amount||!title){alert('請填寫日期、客戶、款項名稱和金額');return;}
+  if(!d||!client||!amount||!title){toast('請填寫日期、客戶、款項名稱和金額', true);return;}
   const inCat = getCatVal('in-cat','in-cat-custom');
   saveCustomCat('income', inCat);
   await window.api.income.add({date:d,client,amount,title,category:inCat,note:v('in-note'),source:'manual'});
@@ -296,7 +328,7 @@ async function addIncome() {
 }
 
 async function delInc(id) {
-  if(!confirm('確定刪除？'))return;
+  if(!await confirmDialog('確定刪除？'))return;
   await window.api.income.delete(id); await renderIncome();
 }
 
@@ -357,7 +389,7 @@ async function saveExpEdit() {
   saveCustomCat('expense', category);
   const note = document.getElementById('exp-edit-note').value.trim();
 
-  if (!date || !vendor || !amount) { alert('請填寫日期、廠商和金額'); return; }
+  if (!date || !vendor || !amount) { toast('請填寫日期、廠商和金額', true); return; }
 
   await window.api.expense.update({ id, date, vendor, title, category, amount, note });
   closeExpEdit();
@@ -367,7 +399,7 @@ async function saveExpEdit() {
 
 async function addExpense() {
   const d=v('ex-date'),vendor=v('ex-vendor'),amount=parseFloat(v('ex-amount')),title=v('ex-title');
-  if(!d||!vendor||!amount||!title){alert('請填寫日期、廠商、支出名稱和金額');return;}
+  if(!d||!vendor||!amount||!title){toast('請填寫日期、廠商、支出名稱和金額', true);return;}
   const exCat = getCatVal('ex-cat','ex-cat-custom');
   saveCustomCat('expense', exCat);
   await window.api.expense.add({date:d,vendor,amount,title,category:exCat,note:v('ex-note'),source:'manual'});
@@ -380,7 +412,7 @@ async function addExpense() {
 }
 
 async function delExp(id) {
-  if(!confirm('確定刪除？'))return;
+  if(!await confirmDialog('確定刪除？'))return;
   await window.api.expense.delete(id); await renderExpense();
 }
 
@@ -391,7 +423,7 @@ async function importReceivablesCSV() {
 
   const { rows } = result;
   if (!rows || rows.length === 0) {
-    alert('找不到有效資料，請確認 CSV 格式正確');
+    toast('找不到有效資料，請確認 CSV 格式正確', true);
     return;
   }
 
@@ -477,7 +509,7 @@ async function renderReceivables() {
 
 async function addReceivable() {
   const issue=v('cl-issue'),due=v('cl-due'),amount=parseFloat(v('cl-amount')),client=v('cl-client'),desc=v('cl-desc');
-  if(!issue||!due||!amount||!client||!desc){alert('請填寫所有必填欄位');return;}
+  if(!issue||!due||!amount||!client||!desc){toast('請填寫所有必填欄位', true);return;}
   await window.api.receivables.add({issue,due,client,desc,invoice:v('cl-inv'),amount});
   ['cl-amount','cl-client','cl-inv','cl-desc'].forEach(clr);
   await renderReceivables();
@@ -515,7 +547,7 @@ async function markPaid(id) {
   document.body.appendChild(statusEl);
   setTimeout(() => statusEl.remove(), 4000);
 }
-async function delRecv(id) { if(!confirm('確定刪除？'))return; await window.api.receivables.delete(id); await renderReceivables(); }
+async function delRecv(id) { if(!await confirmDialog('確定刪除？'))return; await window.api.receivables.delete(id); await renderReceivables(); }
 
 // ── 所有紀錄 ──
 async function renderAll() {
@@ -579,7 +611,7 @@ async function saveRecvEdit() {
   const desc = document.getElementById('recv-edit-desc').value.trim();
   const inv = document.getElementById('recv-edit-inv').value.trim();
   const amount = parseFloat(document.getElementById('recv-edit-amount').value);
-  if (!issue||!due||!client||!desc||!amount) { alert('請填寫所有必填欄位'); return; }
+  if (!issue||!due||!client||!desc||!amount) { toast('請填寫所有必填欄位', true); return; }
   await window.api.receivables.update({id,issue,due,client,desc,invoice:inv,amount});
   closeRecvEdit(); await renderReceivables();
 }
@@ -691,13 +723,13 @@ function drawPieChart(exp) {
 
 async function dbBackup() {
   const ok = await window.api.db.backup();
-  if (ok) alert('備份完成！');
+  if (ok) toast('備份完成！');
 }
 
 async function dbRestore() {
-  if (!confirm('還原後目前所有資料將被備份檔覆蓋，確定繼續？')) return;
+  if (!await confirmDialog('還原後目前所有資料將被備份檔覆蓋，確定繼續？')) return;
   const ok = await window.api.db.restore();
-  if (ok) { alert('還原成功，請重新整理頁面。'); location.reload(); }
+  if (ok) { toast('還原成功，重新載入中...'); setTimeout(() => location.reload(), 1500); }
 }
 
 // ── 客戶管理 ──
@@ -804,21 +836,21 @@ function closeCustModal() { document.getElementById('custModal').classList.add('
 
 async function saveCust() {
   const name=v('cust-name');
-  if(!name){alert('請輸入客戶名稱');return;}
+  if(!name){toast('請輸入客戶名稱', true);return;}
   const id=document.getElementById('cust-edit-id').value;
   const typeEl=document.getElementById('cust-type');
   const data={name,aliases:v('cust-aliases'),type:typeEl?typeEl.value:'both',category:v('cust-category'),contact:v('cust-contact'),note:v('cust-note')};
   if(id) { await window.api.customers.update({...data,id:parseInt(id)}); }
   else {
     const r=await window.api.customers.add(data);
-    if(r.error){alert(r.error);return;}
+    if(r.error){toast(r.error, true);return;}
   }
   closeCustModal();
   await renderCustomers();
 }
 
 async function delCust(id) {
-  if(!confirm('確定刪除此客戶？'))return;
+  if(!await confirmDialog('確定刪除此客戶？'))return;
   await window.api.customers.delete(id); await renderCustomers();
 }
 
@@ -876,7 +908,7 @@ async function openExcel() {
 }
 
 async function analyzeExcel() {
-  if (!apiKey) { alert('請先設定 API Key 才能使用 AI 分析功能'); return; }
+  if (!apiKey) { toast('請先設定 API Key 才能使用 AI 分析功能', true); return; }
   if (!excelRows) return;
   const customers = await window.api.customers.getAll();
   document.getElementById('excelStatus').innerHTML=`
@@ -980,9 +1012,9 @@ async function openCamera() {
     document.getElementById('aiStatus').innerHTML = '';
   } catch(err) {
     if (err.name === 'NotAllowedError') {
-      alert('請允許程式使用鏡頭。\n\nMac 請到「系統設定」→「隱私權與安全性」→「相機」，確認帳務管理系統已勾選。');
+      toast('請允許程式使用鏡頭。\n\nMac 請到「系統設定」→「隱私權與安全性」→「相機」，確認帳務管理系統已勾選。', true);
     } else {
-      alert('無法開啟鏡頭：' + err.message);
+      toast('無法開啟鏡頭：' + err.message, true);
     }
   }
 }
@@ -1094,7 +1126,7 @@ async function confirmAi() {
   const amount=parseFloat(document.getElementById('ai-amount').value);
   const category=getCatVal('ai-cat','ai-cat-custom');
   const note=document.getElementById('ai-note').value.trim();
-  if(!date||!party||!title||!amount){alert('請確認所有必填欄位');return;}
+  if(!date||!party||!title||!amount){toast('請確認所有必填欄位', true);return;}
   if(type==='income') {
     await window.api.income.add({date,client:party,amount,title,category,note,source:'ai'});
     await window.api.customers.autoAdd({name:party, type:'income'});
@@ -1187,7 +1219,7 @@ async function googleAuthorize() {
 }
 
 async function googleRevoke() {
-  if (!confirm('確定要取消 Google 授權嗎？')) return;
+  if (!await confirmDialog('確定要取消 Google 授權嗎？')) return;
   await window.api.google.revokeAuth();
   await initGoogleAuth();
 }
@@ -1198,7 +1230,7 @@ async function googleFetch() {
   document.querySelectorAll('.month-chk').forEach(el => {
     if (el.checked) months.push(parseInt(el.value));
   });
-  if (!months.length) { alert('請至少選擇一個月份'); return; }
+  if (!months.length) { toast('請至少選擇一個月份', true); return; }
 
   const statusEl = document.getElementById('gFetchStatus');
   const previewEl = document.getElementById('gFetchPreview');

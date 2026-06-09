@@ -144,9 +144,22 @@ tr:hover td { background:var(--bg); }
 .tag { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; background:var(--accent-bg); color:var(--accent); margin-right:4px; }
 .amount-pos { color:var(--income); font-weight:500; }
 .amount-neg { color:var(--expense); font-weight:500; }
+#toast{position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(20px);background:#333;color:#fff;padding:10px 20px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:9999}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.error{background:#A32D2D}
 </style>
 </head>
 <body>
+<div id="toast"></div>
+<div class="modal-overlay hidden" id="confirmModal" style="z-index:10000">
+  <div class="modal" style="max-width:340px;text-align:center">
+    <p id="confirmMsg" style="margin-bottom:24px;font-size:15px;line-height:1.6"></p>
+    <div class="modal-foot" style="justify-content:center;gap:12px">
+      <button class="btn" id="confirmCancel">取消</button>
+      <button class="btn btn-danger" id="confirmOk">確定</button>
+    </div>
+  </div>
+</div>
 
 <!-- 更新通知條 -->
 <div id="update-bar" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--accent);color:#fff;padding:10px 20px;align-items:center;justify-content:space-between;font-size:13px;">
