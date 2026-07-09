@@ -175,7 +175,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setDates() {
-  const t = new Date().toISOString().split('T')[0];
+  const t = today();
   ['in-date','ex-date','cl-issue','cl-due'].forEach(id => { const el = document.getElementById(id); if (el) el.value = t; });
 }
 
@@ -247,7 +247,11 @@ async function loadAll() {
   checkOverdue();
 }
 
-const today = () => new Date().toISOString().split('T')[0];
+// 用「本地時區」算今天日期，避免 UTC 換算導致半夜到早上 8 點之間日期算錯一天
+const today = () => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+};
 const fmt = n => 'NT$' + Number(n).toLocaleString();
 const v = id => document.getElementById(id)?.value?.trim() || '';
 const clr = id => { const el = document.getElementById(id); if(el) el.value=''; };
@@ -263,10 +267,10 @@ function srcBadge(src) {
 async function renderIncome() {
   const rows = await window.api.income.getAll();
   document.getElementById('incTbody').innerHTML = rows.length ? rows.map(e=>`
-    <tr><td>${e.date}</td><td>${e.client}</td><td>${e.title}</td>
-    <td><span class="badge b-inc">${e.category}</span></td>
+    <tr><td>${escHtml(e.date)}</td><td>${escHtml(e.client)}</td><td>${escHtml(e.title)}</td>
+    <td><span class="badge b-inc">${escHtml(e.category)}</span></td>
     <td class="amount-pos">${fmt(e.amount)}</td>
-    <td style="color:var(--hint);font-size:12px">${e.note||'—'}</td>
+    <td style="color:var(--hint);font-size:12px">${escHtml(e.note||'—')}</td>
     <td>${srcBadge(e.source)}</td>
     <td style="display:flex;gap:4px">
       <button class="btn btn-sm" onclick="openIncEdit(${e.id},'${esc(e.date)}','${esc(e.client)}','${esc(e.title)}','${esc(e.category||'')}',${e.amount},'${esc(e.note||'')}')">編輯</button>
@@ -329,12 +333,12 @@ async function renderExpense() {
   const rows = await window.api.expense.getAll();
   document.getElementById('expTbody').innerHTML = rows.length ? rows.map(e=>`
     <tr>
-      <td>${e.date}</td>
-      <td>${e.vendor}</td>
-      <td>${e.title}</td>
-      <td><span class="badge b-exp">${e.category||'其他'}</span></td>
+      <td>${escHtml(e.date)}</td>
+      <td>${escHtml(e.vendor)}</td>
+      <td>${escHtml(e.title)}</td>
+      <td><span class="badge b-exp">${escHtml(e.category||'其他')}</span></td>
       <td class="amount-neg">${fmt(e.amount)}</td>
-      <td style="color:var(--hint);font-size:12px">${e.note||'—'}</td>
+      <td style="color:var(--hint);font-size:12px">${escHtml(e.note||'—')}</td>
       <td>${srcBadge(e.source)}</td>
       <td style="display:flex;gap:4px">
         <button class="btn btn-sm" onclick="openExpEdit(${e.id},'${esc(e.date)}','${esc(e.vendor)}','${esc(e.title)}','${esc(e.category||'')}',${e.amount},'${esc(e.note||'')}')">編輯</button>
@@ -425,9 +429,9 @@ async function importReceivablesCSV() {
   // 建立預覽表格
   const previewRows = rows.slice(0, 5).map(r =>
     `<tr>
-      <td>${r.client}</td>
-      <td>${r.desc}</td>
-      <td>${r.due}</td>
+      <td>${escHtml(r.client)}</td>
+      <td>${escHtml(r.desc)}</td>
+      <td>${escHtml(r.due)}</td>
       <td style="font-weight:500">NT$${Number(r.amount).toLocaleString()}</td>
       <td><span class="badge ${r.status==='paid'?'b-paid':'b-pending'}">${r.status==='paid'?'已付款':'待付款'}</span></td>
     </tr>`
@@ -485,9 +489,9 @@ async function renderReceivables() {
   const filtered = rows.filter(r=>filter==='all'||getStatus(r)===filter);
   document.getElementById('recvTbody').innerHTML = filtered.length ? filtered.map(r=>{
     const s=getStatus(r);
-    return `<tr><td>${r.issue_date}</td><td>${r.due_date}${s==='overdue'?' ⚠':''}</td>
-    <td>${r.client}</td><td>${r.description}</td>
-    <td style="font-size:12px;color:var(--hint)">${r.invoice_no||'—'}</td>
+    return `<tr><td>${escHtml(r.issue_date)}</td><td>${escHtml(r.due_date)}${s==='overdue'?' ⚠':''}</td>
+    <td>${escHtml(r.client)}</td><td>${escHtml(r.description)}</td>
+    <td style="font-size:12px;color:var(--hint)">${escHtml(r.invoice_no||'—')}</td>
     <td style="font-weight:500">${fmt(r.amount)}</td>
     <td><span class="badge ${bm[s]}">${lm[s]}</span>${s==='paid'&&r.paid_date?`<br><span style="font-size:10px;color:var(--hint)">${r.paid_date}</span>`:''}</td>
     <td style="display:flex;gap:4px;flex-wrap:wrap">
@@ -517,7 +521,7 @@ async function markPaid(id) {
   await window.api.receivables.markPaid(id);
 
   // 自動同步新增到入帳管理
-  const paidDate = new Date().toISOString().split('T')[0];
+  const paidDate = today();
   await window.api.income.add({
     date: paidDate,
     client: recv.client,
@@ -554,10 +558,10 @@ async function renderAll() {
   if(kw) rows=rows.filter(r=>[r._p,r.title,r.category,r.note].some(v=>String(v||'').toLowerCase().includes(kw)));
   rows.sort((a,b)=>b.date.localeCompare(a.date));
   document.getElementById('allTbody').innerHTML = rows.length ? rows.map(r=>`
-    <tr><td>${r.date}</td>
+    <tr><td>${escHtml(r.date)}</td>
     <td><span class="badge ${r._t==='income'?'b-inc':'b-exp'}">${r._t==='income'?'入帳':'出帳'}</span></td>
-    <td>${r._p}</td><td>${r.title}</td>
-    <td style="font-size:12px;color:var(--hint)">${r.category||'—'}</td>
+    <td>${escHtml(r._p)}</td><td>${escHtml(r.title)}</td>
+    <td style="font-size:12px;color:var(--hint)">${escHtml(r.category||'—')}</td>
     <td class="${r._t==='income'?'amount-pos':'amount-neg'}">${r._t==='income'?'+':'-'}${fmt(r.amount)}</td>
     <td>${srcBadge(r.source)}</td></tr>`).join('')
     : `<tr class="empty-row"><td colspan="7">尚無紀錄</td></tr>`;
@@ -622,9 +626,9 @@ async function checkOverdue() {
         <th style="text-align:left;padding:6px 8px">應付日期</th>
       </tr></thead>
       <tbody>${overdue.map(r=>`<tr style="border-bottom:1px solid var(--border)">
-        <td style="padding:6px 8px">${r.client}</td>
+        <td style="padding:6px 8px">${escHtml(r.client)}</td>
         <td style="padding:6px 8px;color:var(--expense);font-weight:500">${fmt(r.amount)}</td>
-        <td style="padding:6px 8px;color:var(--danger)">${r.due_date}</td>
+        <td style="padding:6px 8px;color:var(--danger)">${escHtml(r.due_date)}</td>
       </tr>`).join('')}</tbody>
     </table>`;
   document.getElementById('overdueModal').classList.remove('hidden');
@@ -750,14 +754,14 @@ async function renderCustomers() {
   const makeCard = (c) => `
     <div class="cust-card">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-        <div class="cust-name" style="margin-bottom:0">${c.name}</div>
+        <div class="cust-name" style="margin-bottom:0">${escHtml(c.name)}</div>
         <span class="badge ${typeBadge[c.type]||'b-inc'}" style="font-size:10px">${typeLabel[c.type]||'入帳客戶'}</span>
       </div>
-      <div class="cust-alias">${c.aliases ? '別名：'+c.aliases : '無別名'}</div>
+      <div class="cust-alias">${c.aliases ? '別名：'+escHtml(c.aliases) : '無別名'}</div>
       <div class="cust-meta">
-        ${c.category?`<span>📁 ${c.category}</span>`:''}
-        ${c.contact?`<span>👤 ${c.contact}</span>`:''}
-        ${c.note&&c.note!=='自動新增'?`<span>📝 ${c.note}</span>`:''}
+        ${c.category?`<span>📁 ${escHtml(c.category)}</span>`:''}
+        ${c.contact?`<span>👤 ${escHtml(c.contact)}</span>`:''}
+        ${c.note&&c.note!=='自動新增'?`<span>📝 ${escHtml(c.note)}</span>`:''}
       </div>
       <div class="cust-actions">
         <button class="btn btn-sm" onclick="openEditCust(${c.id},'${esc(c.name)}','${esc(c.aliases)}','${esc(c.type||'income')}','${esc(c.category)}','${esc(c.contact)}','${esc(c.note)}')">編輯</button>
@@ -800,7 +804,21 @@ async function renderCustomers() {
   grid.innerHTML = html;
 }
 
-function esc(s){ return (s||'').replace(/'/g,"\\'"); }
+// 一般文字/屬性用的 HTML escape（放進 innerHTML 或雙引號屬性都安全）
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+// 用於塞進 onclick="...('...')" 這種雙引號屬性裡的單引號 JS 字串參數：
+// 先做 JS 字串跳脫（反斜線、單引號、換行），再做 HTML 屬性跳脫，避免使用者資料（客戶名稱、備註等）
+// 含有雙引號時提前結束 onclick 屬性，進而注入任意 HTML/JS。
+function esc(s) {
+  const jsEscaped = String(s ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '');
+  return escHtml(jsEscaped);
+}
 
 function openAddCust() {
   document.getElementById('custModalTitle').textContent='新增客戶／廠商';
@@ -930,11 +948,11 @@ function renderExcelPreview() {
       <input type="checkbox" class="row-check" id="chk-${i}" checked />
       ${confDot(r.confidence)}
       <span><span class="badge ${r.type==='income'?'b-inc':'b-exp'}" style="font-size:10px">${r.type==='income'?'入帳':'出帳'}</span></span>
-      <span>${r.date||'—'}</span>
-      <span>${r.party||'—'}${r.isNewCustomer?` <span class="badge b-new" style="font-size:9px">新客戶</span>`:''}</span>
-      <span style="color:var(--muted);font-size:12px">${r.title||'—'}</span>
+      <span>${escHtml(r.date||'—')}</span>
+      <span>${escHtml(r.party||'—')}${r.isNewCustomer?` <span class="badge b-new" style="font-size:9px">新客戶</span>`:''}</span>
+      <span style="color:var(--muted);font-size:12px">${escHtml(r.title||'—')}</span>
       <span style="font-weight:500">${fmt(r.amount||0)}</span>
-      <span style="font-size:11px;color:var(--hint)">${r.invoiceNo||'—'}</span>
+      <span style="font-size:11px;color:var(--hint)">${escHtml(r.invoiceNo||'—')}</span>
       <span><span class="badge ${r.status==='paid'?'b-paid':'b-pending'}" style="font-size:10px">${r.status==='paid'?'已付款':'待付款'}</span></span>
     </div>`).join('');
 
@@ -1085,15 +1103,15 @@ function showAiResult(r) {
     <div class="ai-box">
       <div class="ai-box-title">✦ AI 辨識結果 &nbsp;<span class="badge b-ai">信心：${cl}</span></div>
       <div class="ai-field"><label>類型</label><select id="ai-type" onchange="updateAiCats()"><option value="expense" ${type==='expense'?'selected':''}>出帳（支出）</option><option value="income" ${type==='income'?'selected':''}>入帳（收款）</option></select></div>
-      <div class="ai-field"><label>日期</label><input type="date" id="ai-date" value="${r.date||today()}"/></div>
-      <div class="ai-field"><label>${r.type==='income'?'客戶':'廠商'}</label><input type="text" id="ai-party" value="${r.party||''}"/></div>
-      <div class="ai-field"><label>款項說明</label><input type="text" id="ai-title" value="${r.title||''}"/></div>
+      <div class="ai-field"><label>日期</label><input type="date" id="ai-date" value="${escHtml(r.date||today())}"/></div>
+      <div class="ai-field"><label>${r.type==='income'?'客戶':'廠商'}</label><input type="text" id="ai-party" value="${escHtml(r.party||'')}"/></div>
+      <div class="ai-field"><label>款項說明</label><input type="text" id="ai-title" value="${escHtml(r.title||'')}"/></div>
       <div class="ai-field"><label>金額</label><input type="number" id="ai-amount" value="${r.amount||''}" min="0"/></div>
       <div class="ai-field"><label>類別</label><div style="display:flex;flex-direction:column;gap:4px;flex:1">
         <select id="ai-cat" onchange="toggleCatCustom('ai-cat','ai-cat-custom')">${cats.map(c=>`<option value="${c}" ${c===selectedCat?'selected':''}>${c==='其他'?'其他（自訂）':c}</option>`).join('')}</select>
-        <input type="text" id="ai-cat-custom" placeholder="請輸入自訂類別" style="display:${isCustomCat?'':'none'}" value="${customCatVal}"/>
+        <input type="text" id="ai-cat-custom" placeholder="請輸入自訂類別" style="display:${isCustomCat?'':'none'}" value="${escHtml(customCatVal)}"/>
       </div></div>
-      <div class="ai-field"><label>備註</label><input type="text" id="ai-note" value="${r.note||''}"/></div>
+      <div class="ai-field"><label>備註</label><input type="text" id="ai-note" value="${escHtml(r.note||'')}"/></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
         <button class="btn" onclick="cancelAi()">取消</button>
         <button class="btn btn-ai" onclick="confirmAi()">✓ 確認並新增</button>
@@ -1151,11 +1169,11 @@ async function renderAiHist() {
   ].sort((a,b)=>b.id-a.id).slice(0,10);
   const tb=document.getElementById('aiHistTbody');
   if(tb) tb.innerHTML=rows.length?rows.map(r=>`
-    <tr><td>${r.date}</td>
+    <tr><td>${escHtml(r.date)}</td>
     <td><span class="badge ${r._t==='income'?'b-inc':'b-exp'}">${r._t==='income'?'入帳':'出帳'}</span></td>
-    <td>${r._p}</td><td>${r.title}</td>
+    <td>${escHtml(r._p)}</td><td>${escHtml(r.title)}</td>
     <td class="${r._t==='income'?'amount-pos':'amount-neg'}">${r._t==='income'?'+':'-'}${fmt(r.amount)}</td>
-    <td><span class="badge b-ai" style="font-size:10px">${r.category}</span></td></tr>`).join('')
+    <td><span class="badge b-ai" style="font-size:10px">${escHtml(r.category)}</span></td></tr>`).join('')
     :`<tr class="empty-row"><td colspan="6">尚未透過 AI 新增任何紀錄</td></tr>`;
 }
 
@@ -1262,9 +1280,9 @@ async function googleFetch() {
     return `
     <tr style="${dup ? 'opacity:0.5' : ''}">
       <td><input type="checkbox" class="row-check" id="gchk-${i}" ${dup ? '' : 'checked'} /></td>
-      <td>${r.client}</td>
+      <td>${escHtml(r.client)}</td>
       <td>${r.year || 115}年${r.month}月</td>
-      <td style="font-size:12px;color:var(--muted)">${r.matchedPeriod || '—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${escHtml(r.matchedPeriod || '—')}</td>
       <td style="font-weight:500">NT$${Number(r.amount).toLocaleString()}</td>
       <td>${dup ? '<span class="badge" style="background:var(--muted);color:#fff;font-size:11px">已存在</span>' : ''}</td>
     </tr>`;
@@ -1312,8 +1330,8 @@ async function confirmGoogleImport(data) {
 
     // 匯入應收帳款
     await window.api.receivables.add({
-      issue: r.issueDate || new Date().toISOString().split('T')[0],
-      due: r.dueDate || new Date().toISOString().split('T')[0],
+      issue: r.issueDate || today(),
+      due: r.dueDate || today(),
       client: r.client,
       desc: `${r.matchedPeriod || (r.year||115)+'年'+r.month+'月'} 服務費`,
       amount: r.amount,

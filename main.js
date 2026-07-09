@@ -6,6 +6,33 @@ const fs = require('fs');
 let mainWindow;
 let db;
 
+// 用「本地時區」算今天日期，避免 UTC 換算導致半夜到早上 8 點之間日期算錯一天
+function localDateStr() {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+}
+
+// 正確處理含逗號、雙引號欄位的 CSV 單行解析（取代直接 split(',')）
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; }
+        else inQuotes = false;
+      } else cur += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { result.push(cur.trim()); cur = ''; }
+      else cur += c;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function getDataDir() {
   // 安裝版存在 AppData（Windows）或 Application Support（Mac），開發版存在專案 data/
   const dir = app.isPackaged
@@ -166,7 +193,7 @@ ipcMain.handle('receivables:add', (_, d) => {
   return { id: r.lastInsertRowid, ...d };
 });
 ipcMain.handle('receivables:markPaid', (_, id) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
   db.prepare('UPDATE receivables SET status=?,paid_date=? WHERE id=?').run('paid',today,id);
   return true;
 });
@@ -218,7 +245,7 @@ ipcMain.handle('app:openDataFolder', () => {
 // ── 匯出 CSV ──
 ipcMain.handle('export:csv', async () => {
   const { filePath } = await dialog.showSaveDialog(mainWindow, {
-    title: '匯出帳務紀錄', defaultPath: `帳務紀錄_${new Date().toISOString().split('T')[0]}.csv`,
+    title: '匯出帳務紀錄', defaultPath: `帳務紀錄_${localDateStr()}.csv`,
     filters: [{ name: 'CSV', extensions: ['csv'] }]
   });
   if (!filePath) return false;
@@ -395,7 +422,7 @@ ipcMain.handle('excel:importTemplate', async () => {
 
   const XLSX = require('xlsx');
   const workbook = XLSX.readFile(filePaths[0]);
-  const today = new Date().toISOString().split('T')[0];
+  const today = localDateStr();
   const result = { income: [], expense: [], receivables: [], errors: [] };
 
   const parseDate = (val) => {
@@ -495,11 +522,11 @@ ipcMain.handle('receivables:importCSV', async () => {
   const lines = content.split('\n').filter(l => l.trim());
   if (lines.length < 2) return { count: 0, rows: [] };
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,''));
+  const headers = parseCSVLine(lines[0]);
   const rows = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(',').map(v => v.trim().replace(/"/g,''));
+    const vals = parseCSVLine(lines[i]);
     if (vals.length < 3) continue;
     const row = {};
     headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
@@ -509,8 +536,8 @@ ipcMain.handle('receivables:importCSV', async () => {
     if (!client || !amount) continue;
 
     rows.push({
-      issue: row['開立日期'] || new Date().toISOString().split('T')[0],
-      due: row['應付日期'] || new Date().toISOString().split('T')[0],
+      issue: row['開立日期'] || localDateStr(),
+      due: row['應付日期'] || localDateStr(),
       client,
       desc: row['說明'] || '服務費',
       amount,
@@ -535,11 +562,11 @@ ipcMain.handle('customers:importCSV', async () => {
   const lines = content.split('\n').filter(l => l.trim());
   if (lines.length < 2) return { count: 0, skipped: 0 };
 
-  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g,''));
+  const headers = parseCSVLine(lines[0]);
   let count = 0, skipped = 0;
 
   for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(',').map(v => v.trim().replace(/"/g,''));
+    const vals = parseCSVLine(lines[i]);
     const row = {};
     headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
 
@@ -547,9 +574,9 @@ ipcMain.handle('customers:importCSV', async () => {
     if (!name) continue;
 
     try {
-      db.prepare('INSERT OR IGNORE INTO customers (name,aliases,category,contact,note) VALUES (?,?,?,?,?)')
+      const info = db.prepare('INSERT OR IGNORE INTO customers (name,aliases,category,contact,note) VALUES (?,?,?,?,?)')
         .run(name, row['別名']||'', row['分類']||'', row['聯絡人']||'', row['備註']||'');
-      count++;
+      if (info.changes > 0) count++; else skipped++;
     } catch(e) { skipped++; }
   }
 
@@ -617,7 +644,7 @@ ipcMain.handle('customCats:add', (_, type, name) => {
 ipcMain.handle('db:backup', async () => {
   const { filePath } = await dialog.showSaveDialog(mainWindow, {
     title: '備份資料庫',
-    defaultPath: `帳務備份_${new Date().toISOString().split('T')[0]}.db`,
+    defaultPath: `帳務備份_${localDateStr()}.db`,
     filters: [{ name: '資料庫備份', extensions: ['db'] }]
   });
   if (!filePath) return false;
