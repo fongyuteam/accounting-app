@@ -520,10 +520,10 @@ async function markPaid(id) {
   // 確認付款
   await window.api.receivables.markPaid(id);
 
-  // 自動同步新增到入帳管理
-  const paidDate = today();
+  // 自動同步新增到入帳管理：用「應收帳款的開立日期」而非「確認收款當天」，
+  // 這樣不管客戶延後多久才付款，都會算在原本款項所屬的月份
   await window.api.income.add({
-    date: paidDate,
+    date: recv.issue_date,
     client: recv.client,
     amount: recv.amount,
     title: recv.description || '客戶付款',
@@ -639,6 +639,30 @@ async function renderReport() {
   const [inc, exp] = await Promise.all([window.api.income.getAll(), window.api.expense.getAll()]);
   drawBarChart(inc, exp);
   drawPieChart(exp);
+  renderMonthlyTable(inc, exp);
+}
+
+// 每月收支明細：把全部歷史紀錄依「YYYY-MM」分組，列出每個月各自的入帳/出帳/淨收支
+function renderMonthlyTable(inc, exp) {
+  const tbody = document.getElementById('monthlyTbody');
+  if (!tbody) return;
+  const map = {};
+  const bump = (date, key, amount) => {
+    const m = String(date || '').slice(0, 7);
+    if (!m) return;
+    if (!map[m]) map[m] = { inc: 0, exp: 0 };
+    map[m][key] += amount;
+  };
+  inc.forEach(r => bump(r.date, 'inc', r.amount));
+  exp.forEach(r => bump(r.date, 'exp', r.amount));
+
+  const months = Object.keys(map).sort((a, b) => b.localeCompare(a));
+  tbody.innerHTML = months.length ? months.map(m => {
+    const { inc: i, exp: e } = map[m];
+    const net = i - e;
+    return `<tr><td>${m}</td><td class="amount-pos">${fmt(i)}</td><td class="amount-neg">${fmt(e)}</td>
+      <td class="${net >= 0 ? 'amount-pos' : 'amount-neg'}">${net >= 0 ? '+' : ''}${fmt(net)}</td></tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="4">尚無資料</td></tr>`;
 }
 
 function drawBarChart(inc, exp) {
