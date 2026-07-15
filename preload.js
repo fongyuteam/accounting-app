@@ -48,7 +48,10 @@ contextBridge.exposeInMainWorld('api', {
     downloadTemplate: () => ipcRenderer.invoke('excel:downloadTemplate'),
     importTemplate: () => ipcRenderer.invoke('excel:importTemplate')
   },
-  app: { openDataFolder: () => ipcRenderer.invoke('app:openDataFolder') },
+  app: {
+    openDataFolder: () => ipcRenderer.invoke('app:openDataFolder'),
+    getVersion: () => ipcRenderer.invoke('app:getVersion')
+  },
   google: {
     checkAuth: () => ipcRenderer.invoke('google:checkAuth'),
     authorize: () => ipcRenderer.invoke('google:authorize'),

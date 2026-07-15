@@ -4,6 +4,40 @@ let apiKey = localStorage.getItem('anthropic_api_key') || '';
 let excelRows = null;
 let analyzedRows = null;
 
+// ── 通用分頁 ──
+let incPage = 1, expPage = 1, recvPage = 1, allPage = 1, monthlyPage = 1;
+const PAGE_SIZE = 15;         // 入帳/出帳/客戶付款追蹤 每頁筆數
+const ALL_PAGE_SIZE = 20;     // 所有紀錄 每頁筆數
+const MONTHLY_PAGE_SIZE = 6;  // 每月收支明細 每頁月份數
+
+function paginate(rows, page, pageSize) {
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const p = Math.min(Math.max(1, page), totalPages);
+  const start = (p - 1) * pageSize;
+  return { pageRows: rows.slice(start, start + pageSize), page: p, totalPages };
+}
+
+function renderPager(containerId, page, totalPages, gotoFnName) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (totalPages <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <button class="btn btn-sm" ${page<=1?'disabled':''} onclick="${gotoFnName}(${page-1})">‹ 上一頁</button>
+    <span style="font-size:12px;color:var(--muted)">第 ${page} / ${totalPages} 頁</span>
+    <button class="btn btn-sm" ${page>=totalPages?'disabled':''} onclick="${gotoFnName}(${page+1})">下一頁 ›</button>`;
+}
+
+function incGotoPage(p) { incPage = p; renderIncome(); }
+function expGotoPage(p) { expPage = p; renderExpense(); }
+function recvGotoPage(p) { recvPage = p; renderReceivables(); }
+function allGotoPage(p) { allPage = p; renderAll(); }
+function monthlyGotoPage(p) { monthlyPage = p; renderMonthlyTable(_reportCache.inc, _reportCache.exp); }
+
+function incFilterChanged() { incPage = 1; renderIncome(); }
+function expFilterChanged() { expPage = 1; renderExpense(); }
+function recvFilterChanged() { recvPage = 1; renderReceivables(); }
+function monthlyFilterChanged() { monthlyPage = 1; renderMonthlyTable(_reportCache.inc, _reportCache.exp); }
+
 // ── Toast 通知（取代 alert 避免 Electron 失焦問題）──
 let _toastTimer;
 function toast(msg, isError = false) {
@@ -153,7 +187,8 @@ window.api = {
     }
   },
   app: {
-    openDataFolder: () => _post('/api/app/open-data-folder', {})
+    openDataFolder: () => _post('/api/app/open-data-folder', {}),
+    getVersion: () => _get('/api/app/version')
   },
   google: {
     checkAuth:     () => _get('/api/google/check-auth'),
@@ -171,8 +206,18 @@ window.api = {
 window.addEventListener('DOMContentLoaded', async () => {
   setDates();
   updateApiKeyUI();
+  showAppVersion();
   await loadAll();
 });
+
+async function showAppVersion() {
+  const el = document.getElementById('appVersion');
+  if (!el || !window.api?.app?.getVersion) return;
+  try {
+    const version = await window.api.app.getVersion();
+    if (version) el.textContent = 'v' + version;
+  } catch (e) {}
+}
 
 function setDates() {
   const t = today();
@@ -265,8 +310,12 @@ function srcBadge(src) {
 
 // ── 入帳 ──
 async function renderIncome() {
-  const rows = await window.api.income.getAll();
-  document.getElementById('incTbody').innerHTML = rows.length ? rows.map(e=>`
+  const mf = document.getElementById('in-month')?.value || '';
+  let rows = await window.api.income.getAll();
+  if (mf) rows = rows.filter(r => r.date.startsWith(mf));
+  const { pageRows, page, totalPages } = paginate(rows, incPage, PAGE_SIZE);
+  incPage = page;
+  document.getElementById('incTbody').innerHTML = pageRows.length ? pageRows.map(e=>`
     <tr><td>${escHtml(e.date)}</td><td>${escHtml(e.client)}</td><td>${escHtml(e.title)}</td>
     <td><span class="badge b-inc">${escHtml(e.category)}</span></td>
     <td class="amount-pos">${fmt(e.amount)}</td>
@@ -276,7 +325,8 @@ async function renderIncome() {
       <button class="btn btn-sm" onclick="openIncEdit(${e.id},'${esc(e.date)}','${esc(e.client)}','${esc(e.title)}','${esc(e.category||'')}',${e.amount},'${esc(e.note||'')}')">編輯</button>
       <button class="btn btn-sm btn-danger" onclick="delInc(${e.id})">刪除</button>
     </td></tr>`).join('')
-    : `<tr class="empty-row"><td colspan="8">尚無入帳紀錄</td></tr>`;
+    : `<tr class="empty-row"><td colspan="8">${mf ? '此月份尚無入帳紀錄' : '尚無入帳紀錄'}</td></tr>`;
+  renderPager('incPager', page, totalPages, 'incGotoPage');
   updateSummary();
 }
 
@@ -330,8 +380,12 @@ async function delInc(id) {
 
 // ── 出帳 ──
 async function renderExpense() {
-  const rows = await window.api.expense.getAll();
-  document.getElementById('expTbody').innerHTML = rows.length ? rows.map(e=>`
+  const mf = document.getElementById('ex-month')?.value || '';
+  let rows = await window.api.expense.getAll();
+  if (mf) rows = rows.filter(r => r.date.startsWith(mf));
+  const { pageRows, page, totalPages } = paginate(rows, expPage, PAGE_SIZE);
+  expPage = page;
+  document.getElementById('expTbody').innerHTML = pageRows.length ? pageRows.map(e=>`
     <tr>
       <td>${escHtml(e.date)}</td>
       <td>${escHtml(e.vendor)}</td>
@@ -345,7 +399,8 @@ async function renderExpense() {
         <button class="btn btn-sm btn-danger" onclick="delExp(${e.id})">刪除</button>
       </td>
     </tr>`).join('')
-    : `<tr class="empty-row"><td colspan="8">尚無出帳紀錄</td></tr>`;
+    : `<tr class="empty-row"><td colspan="8">${mf ? '此月份尚無出帳紀錄' : '尚無出帳紀錄'}</td></tr>`;
+  renderPager('expPager', page, totalPages, 'expGotoPage');
   updateSummary();
 }
 
@@ -483,11 +538,15 @@ function getStatus(r) {
 
 async function renderReceivables() {
   const filter = document.getElementById('cl-filter')?.value||'all';
-  const rows = await window.api.receivables.getAll();
+  const mf = document.getElementById('cl-month')?.value || '';
+  let rows = await window.api.receivables.getAll();
   const bm={paid:'b-paid',pending:'b-pending',overdue:'b-overdue'};
   const lm={paid:'已付款',pending:'待付款',overdue:'已逾期'};
-  const filtered = rows.filter(r=>filter==='all'||getStatus(r)===filter);
-  document.getElementById('recvTbody').innerHTML = filtered.length ? filtered.map(r=>{
+  let filtered = rows.filter(r=>filter==='all'||getStatus(r)===filter);
+  if (mf) filtered = filtered.filter(r => r.issue_date.startsWith(mf));
+  const { pageRows, page, totalPages } = paginate(filtered, recvPage, PAGE_SIZE);
+  recvPage = page;
+  document.getElementById('recvTbody').innerHTML = pageRows.length ? pageRows.map(r=>{
     const s=getStatus(r);
     return `<tr><td>${escHtml(r.issue_date)}</td><td>${escHtml(r.due_date)}${s==='overdue'?' ⚠':''}</td>
     <td>${escHtml(r.client)}</td><td>${escHtml(r.description)}</td>
@@ -500,6 +559,7 @@ async function renderReceivables() {
       <button class="btn btn-sm btn-danger" onclick="delRecv(${r.id})">刪除</button>
     </td></tr>`;
   }).join('') : `<tr class="empty-row"><td colspan="8">尚無應收帳款</td></tr>`;
+  renderPager('recvPager', page, totalPages, 'recvGotoPage');
   updateSummary();
 }
 
@@ -557,7 +617,9 @@ async function renderAll() {
   if(mf) rows=rows.filter(r=>r.date.startsWith(mf));
   if(kw) rows=rows.filter(r=>[r._p,r.title,r.category,r.note].some(v=>String(v||'').toLowerCase().includes(kw)));
   rows.sort((a,b)=>b.date.localeCompare(a.date));
-  document.getElementById('allTbody').innerHTML = rows.length ? rows.map(r=>`
+  const { pageRows, page, totalPages } = paginate(rows, allPage, ALL_PAGE_SIZE);
+  allPage = page;
+  document.getElementById('allTbody').innerHTML = pageRows.length ? pageRows.map(r=>`
     <tr><td>${escHtml(r.date)}</td>
     <td><span class="badge ${r._t==='income'?'b-inc':'b-exp'}">${r._t==='income'?'入帳':'出帳'}</span></td>
     <td>${escHtml(r._p)}</td><td>${escHtml(r.title)}</td>
@@ -565,6 +627,7 @@ async function renderAll() {
     <td class="${r._t==='income'?'amount-pos':'amount-neg'}">${r._t==='income'?'+':'-'}${fmt(r.amount)}</td>
     <td>${srcBadge(r.source)}</td></tr>`).join('')
     : `<tr class="empty-row"><td colspan="7">尚無紀錄</td></tr>`;
+  renderPager('allPager', page, totalPages, 'allGotoPage');
 }
 
 // ── Summary ──
@@ -635,8 +698,11 @@ async function checkOverdue() {
 }
 
 // ── 報表圖表 ──
+let _reportCache = { inc: [], exp: [] };
+
 async function renderReport() {
   const [inc, exp] = await Promise.all([window.api.income.getAll(), window.api.expense.getAll()]);
+  _reportCache = { inc, exp };
   drawBarChart(inc, exp);
   drawPieChart(exp);
   renderMonthlyTable(inc, exp);
@@ -646,6 +712,7 @@ async function renderReport() {
 function renderMonthlyTable(inc, exp) {
   const tbody = document.getElementById('monthlyTbody');
   if (!tbody) return;
+  const mf = document.getElementById('monthly-filter')?.value || '';
   const map = {};
   const bump = (date, key, amount) => {
     const m = String(date || '').slice(0, 7);
@@ -656,13 +723,17 @@ function renderMonthlyTable(inc, exp) {
   inc.forEach(r => bump(r.date, 'inc', r.amount));
   exp.forEach(r => bump(r.date, 'exp', r.amount));
 
-  const months = Object.keys(map).sort((a, b) => b.localeCompare(a));
-  tbody.innerHTML = months.length ? months.map(m => {
+  let months = Object.keys(map).sort((a, b) => b.localeCompare(a));
+  if (mf) months = months.filter(m => m === mf);
+  const { pageRows: pageMonths, page, totalPages } = paginate(months, monthlyPage, MONTHLY_PAGE_SIZE);
+  monthlyPage = page;
+  tbody.innerHTML = pageMonths.length ? pageMonths.map(m => {
     const { inc: i, exp: e } = map[m];
     const net = i - e;
     return `<tr><td>${m}</td><td class="amount-pos">${fmt(i)}</td><td class="amount-neg">${fmt(e)}</td>
       <td class="${net >= 0 ? 'amount-pos' : 'amount-neg'}">${net >= 0 ? '+' : ''}${fmt(net)}</td></tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="4">尚無資料</td></tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="4">${mf ? '此月份尚無資料' : '尚無資料'}</td></tr>`;
+  renderPager('monthlyPager', page, totalPages, 'monthlyGotoPage');
 }
 
 function drawBarChart(inc, exp) {

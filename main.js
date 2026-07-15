@@ -187,7 +187,9 @@ ipcMain.handle('expense:update', (_, d) => {
 });
 
 // ── 應收帳款 ──
-ipcMain.handle('receivables:getAll', () => db.prepare('SELECT * FROM receivables ORDER BY due_date ASC').all());
+// 依「開立日期」（款項所屬月份）由新到舊排序，跟入帳/出帳的排序邏輯一致，
+// 方便一眼看出哪些客戶屬於哪個月份；同月份再依應付日期、客戶名稱排序
+ipcMain.handle('receivables:getAll', () => db.prepare('SELECT * FROM receivables ORDER BY issue_date DESC, due_date DESC, client ASC').all());
 ipcMain.handle('receivables:add', (_, d) => {
   const r = db.prepare('INSERT INTO receivables (issue_date,due_date,client,description,invoice_no,amount) VALUES (?,?,?,?,?,?)').run(d.issue,d.due,d.client,d.desc,d.invoice||'',d.amount);
   return { id: r.lastInsertRowid, ...d };
@@ -241,6 +243,7 @@ ipcMain.handle('app:openDataFolder', () => {
   shell.showItemInFolder(dbPath);
   return true;
 });
+ipcMain.handle('app:getVersion', () => app.getVersion());
 
 // ── 匯出 CSV ──
 ipcMain.handle('export:csv', async () => {
