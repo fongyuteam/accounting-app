@@ -7,8 +7,8 @@ let analyzedRows = null;
 // ── 通用分頁 ──
 let incPage = 1, expPage = 1, recvPage = 1, allPage = 1, monthlyPage = 1;
 const PAGE_SIZE = 15;         // 入帳/出帳/客戶付款追蹤 每頁筆數
-const ALL_PAGE_SIZE = 20;     // 所有紀錄 每頁筆數
-const MONTHLY_PAGE_SIZE = 6;  // 每月收支明細 每頁月份數
+const ALL_PAGE_SIZE = 10;     // 所有紀錄 每頁筆數
+const MONTHLY_PAGE_SIZE = 3;  // 每月收支明細 每頁月份數
 
 function paginate(rows, page, pageSize) {
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -31,7 +31,7 @@ function incGotoPage(p) { incPage = p; renderIncome(); }
 function expGotoPage(p) { expPage = p; renderExpense(); }
 function recvGotoPage(p) { recvPage = p; renderReceivables(); }
 function allGotoPage(p) { allPage = p; renderAll(); }
-function monthlyGotoPage(p) { monthlyPage = p; renderMonthlyTable(_reportCache.inc, _reportCache.exp); }
+function monthlyGotoPage(p) { monthlyPage = p; renderMonthlyTable(_recordsCache.inc, _recordsCache.exp); }
 
 // 從說明文字判斷「這筆款項實際屬於哪個月份」，例如「115年5月服務費」「115/05/01-05/31 服務費」，
 // 抓到就轉成西元 YYYY-MM；抓不到（例如手動輸入沒有固定格式）就回傳 null，交給呼叫端 fallback 用日期判斷。
@@ -49,7 +49,6 @@ function parseMonthFromText(text) {
 function incFilterChanged() { incPage = 1; renderIncome(); }
 function expFilterChanged() { expPage = 1; renderExpense(); }
 function recvFilterChanged() { recvPage = 1; renderReceivables(); }
-function monthlyFilterChanged() { monthlyPage = 1; renderMonthlyTable(_reportCache.inc, _reportCache.exp); }
 
 // ── Toast 通知（取代 alert 避免 Electron 失焦問題）──
 let _toastTimer;
@@ -629,11 +628,15 @@ async function markPaid(id) {
 async function delRecv(id) { if(!await confirmDialog('確定刪除？'))return; await window.api.receivables.delete(id); await renderReceivables(); }
 
 // ── 所有紀錄 ──
+let _recordsCache = { inc: [], exp: [] };
+
 async function renderAll() {
   const tf=document.getElementById('rec-type')?.value||'all';
   const mf=document.getElementById('rec-month')?.value||'';
   const kw=(document.getElementById('rec-search')?.value||'').trim().toLowerCase();
   const [inc,exp] = await Promise.all([window.api.income.getAll(),window.api.expense.getAll()]);
+  _recordsCache = { inc, exp };
+  renderMonthlyTable(inc, exp);
   let rows=[];
   if(tf!=='expense') inc.forEach(e=>rows.push({...e,_t:'income',_p:e.client}));
   if(tf!=='income') exp.forEach(e=>rows.push({...e,_t:'expense',_p:e.vendor}));
@@ -721,21 +724,18 @@ async function checkOverdue() {
 }
 
 // ── 報表圖表 ──
-let _reportCache = { inc: [], exp: [] };
-
 async function renderReport() {
   const [inc, exp] = await Promise.all([window.api.income.getAll(), window.api.expense.getAll()]);
-  _reportCache = { inc, exp };
   drawBarChart(inc, exp);
   drawPieChart(exp);
-  renderMonthlyTable(inc, exp);
 }
 
 // 每月收支明細：把全部歷史紀錄依「YYYY-MM」分組，列出每個月各自的入帳/出帳/淨收支
+// 現在跟「所有紀錄」共用同一個 rec-month 篩選：選了月份就只顯示該月，同時上方摘要跟下方明細連動
 function renderMonthlyTable(inc, exp) {
   const tbody = document.getElementById('monthlyTbody');
   if (!tbody) return;
-  const mf = document.getElementById('monthly-filter')?.value || '';
+  const mf = document.getElementById('rec-month')?.value || '';
   const map = {};
   const bump = (m, key, amount) => {
     if (!m) return;
@@ -770,8 +770,9 @@ function drawBarChart(inc, exp) {
   }
   const incM = {}, expM = {};
   months.forEach(m => { incM[m] = 0; expM[m] = 0; });
-  inc.forEach(r => { if (incM[r.date.slice(0,7)] !== undefined) incM[r.date.slice(0,7)] += r.amount; });
-  exp.forEach(r => { if (expM[r.date.slice(0,7)] !== undefined) expM[r.date.slice(0,7)] += r.amount; });
+  // 跟每月收支明細用同一套判斷邏輯：入帳優先看款項名稱裡的月份說明，抓不到才用日期
+  inc.forEach(r => { const m = parseMonthFromText(r.title) || r.date.slice(0,7); if (incM[m] !== undefined) incM[m] += r.amount; });
+  exp.forEach(r => { const m = r.date.slice(0,7); if (expM[m] !== undefined) expM[m] += r.amount; });
   const maxVal = Math.max(...months.map(m => Math.max(incM[m], expM[m])), 1);
   const W = canvas.offsetWidth || 600;
   canvas.width = W; canvas.height = 220;
