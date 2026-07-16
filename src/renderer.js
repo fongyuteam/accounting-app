@@ -33,6 +33,19 @@ function recvGotoPage(p) { recvPage = p; renderReceivables(); }
 function allGotoPage(p) { allPage = p; renderAll(); }
 function monthlyGotoPage(p) { monthlyPage = p; renderMonthlyTable(_reportCache.inc, _reportCache.exp); }
 
+// 從說明文字判斷「這筆款項實際屬於哪個月份」，例如「115年5月服務費」「115/05/01-05/31 服務費」，
+// 抓到就轉成西元 YYYY-MM；抓不到（例如手動輸入沒有固定格式）就回傳 null，交給呼叫端 fallback 用日期判斷。
+// Google Drive 同步的單據常常隔月才開立，開立日期不能代表款項真正所屬的月份，所以優先看說明文字。
+function parseMonthFromText(text) {
+  if (!text) return null;
+  const s = String(text);
+  let m = s.match(/(\d{3})年(\d{1,2})月/);
+  if (m) return `${parseInt(m[1]) + 1911}-${String(parseInt(m[2])).padStart(2,'0')}`;
+  m = s.match(/(\d{3})\/(\d{1,2})\//);
+  if (m) return `${parseInt(m[1]) + 1911}-${String(parseInt(m[2])).padStart(2,'0')}`;
+  return null;
+}
+
 function incFilterChanged() { incPage = 1; renderIncome(); }
 function expFilterChanged() { expPage = 1; renderExpense(); }
 function recvFilterChanged() { recvPage = 1; renderReceivables(); }
@@ -311,8 +324,10 @@ function srcBadge(src) {
 // ── 入帳 ──
 async function renderIncome() {
   const mf = document.getElementById('in-month')?.value || '';
+  const kw = (document.getElementById('in-search')?.value || '').trim().toLowerCase();
   let rows = await window.api.income.getAll();
   if (mf) rows = rows.filter(r => r.date.startsWith(mf));
+  if (kw) rows = rows.filter(r => [r.client,r.title,r.category,r.note].some(v => String(v||'').toLowerCase().includes(kw)));
   const { pageRows, page, totalPages } = paginate(rows, incPage, PAGE_SIZE);
   incPage = page;
   document.getElementById('incTbody').innerHTML = pageRows.length ? pageRows.map(e=>`
@@ -325,7 +340,7 @@ async function renderIncome() {
       <button class="btn btn-sm" onclick="openIncEdit(${e.id},'${esc(e.date)}','${esc(e.client)}','${esc(e.title)}','${esc(e.category||'')}',${e.amount},'${esc(e.note||'')}')">編輯</button>
       <button class="btn btn-sm btn-danger" onclick="delInc(${e.id})">刪除</button>
     </td></tr>`).join('')
-    : `<tr class="empty-row"><td colspan="8">${mf ? '此月份尚無入帳紀錄' : '尚無入帳紀錄'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="8">${(mf||kw) ? '沒有符合條件的入帳紀錄' : '尚無入帳紀錄'}</td></tr>`;
   renderPager('incPager', page, totalPages, 'incGotoPage');
   updateSummary();
 }
@@ -381,8 +396,10 @@ async function delInc(id) {
 // ── 出帳 ──
 async function renderExpense() {
   const mf = document.getElementById('ex-month')?.value || '';
+  const kw = (document.getElementById('ex-search')?.value || '').trim().toLowerCase();
   let rows = await window.api.expense.getAll();
   if (mf) rows = rows.filter(r => r.date.startsWith(mf));
+  if (kw) rows = rows.filter(r => [r.vendor,r.title,r.category,r.note].some(v => String(v||'').toLowerCase().includes(kw)));
   const { pageRows, page, totalPages } = paginate(rows, expPage, PAGE_SIZE);
   expPage = page;
   document.getElementById('expTbody').innerHTML = pageRows.length ? pageRows.map(e=>`
@@ -399,7 +416,7 @@ async function renderExpense() {
         <button class="btn btn-sm btn-danger" onclick="delExp(${e.id})">刪除</button>
       </td>
     </tr>`).join('')
-    : `<tr class="empty-row"><td colspan="8">${mf ? '此月份尚無出帳紀錄' : '尚無出帳紀錄'}</td></tr>`;
+    : `<tr class="empty-row"><td colspan="8">${(mf||kw) ? '沒有符合條件的出帳紀錄' : '尚無出帳紀錄'}</td></tr>`;
   renderPager('expPager', page, totalPages, 'expGotoPage');
   updateSummary();
 }
@@ -539,11 +556,17 @@ function getStatus(r) {
 async function renderReceivables() {
   const filter = document.getElementById('cl-filter')?.value||'all';
   const mf = document.getElementById('cl-month')?.value || '';
+  const kw = (document.getElementById('cl-search')?.value || '').trim().toLowerCase();
   let rows = await window.api.receivables.getAll();
+  // 用說明文字判斷款項實際所屬月份（Google 同步的單據常隔月才開立，開立日期不準），
+  // 判斷不出來就 fallback 用開立日期
+  rows = rows.map(r => ({ ...r, _month: parseMonthFromText(r.description) || r.issue_date.slice(0,7) }));
+  rows.sort((a,b) => b._month.localeCompare(a._month) || b.due_date.localeCompare(a.due_date) || a.client.localeCompare(b.client));
   const bm={paid:'b-paid',pending:'b-pending',overdue:'b-overdue'};
   const lm={paid:'已付款',pending:'待付款',overdue:'已逾期'};
   let filtered = rows.filter(r=>filter==='all'||getStatus(r)===filter);
-  if (mf) filtered = filtered.filter(r => r.issue_date.startsWith(mf));
+  if (mf) filtered = filtered.filter(r => r._month === mf);
+  if (kw) filtered = filtered.filter(r => [r.client,r.description,r.invoice_no].some(v => String(v||'').toLowerCase().includes(kw)));
   const { pageRows, page, totalPages } = paginate(filtered, recvPage, PAGE_SIZE);
   recvPage = page;
   document.getElementById('recvTbody').innerHTML = pageRows.length ? pageRows.map(r=>{
@@ -558,7 +581,7 @@ async function renderReceivables() {
       <button class="btn btn-sm" onclick="openRecvEdit(${r.id},'${esc(r.issue_date)}','${esc(r.due_date)}','${esc(r.client)}','${esc(r.description)}','${esc(r.invoice_no||'')}',${r.amount})">編輯</button>
       <button class="btn btn-sm btn-danger" onclick="delRecv(${r.id})">刪除</button>
     </td></tr>`;
-  }).join('') : `<tr class="empty-row"><td colspan="8">尚無應收帳款</td></tr>`;
+  }).join('') : `<tr class="empty-row"><td colspan="8">${(mf||kw||filter!=='all') ? '沒有符合條件的應收帳款' : '尚無應收帳款'}</td></tr>`;
   renderPager('recvPager', page, totalPages, 'recvGotoPage');
   updateSummary();
 }
@@ -714,14 +737,15 @@ function renderMonthlyTable(inc, exp) {
   if (!tbody) return;
   const mf = document.getElementById('monthly-filter')?.value || '';
   const map = {};
-  const bump = (date, key, amount) => {
-    const m = String(date || '').slice(0, 7);
+  const bump = (m, key, amount) => {
     if (!m) return;
     if (!map[m]) map[m] = { inc: 0, exp: 0 };
     map[m][key] += amount;
   };
-  inc.forEach(r => bump(r.date, 'inc', r.amount));
-  exp.forEach(r => bump(r.date, 'exp', r.amount));
+  // 入帳優先用款項名稱判斷實際所屬月份——來自客戶付款追蹤確認收款的紀錄，
+  // 款項名稱會保留原始說明文字（例如「115年5月服務費」），判斷不出來才 fallback 用日期
+  inc.forEach(r => bump(parseMonthFromText(r.title) || String(r.date||'').slice(0,7), 'inc', r.amount));
+  exp.forEach(r => bump(String(r.date||'').slice(0,7), 'exp', r.amount));
 
   let months = Object.keys(map).sort((a, b) => b.localeCompare(a));
   if (mf) months = months.filter(m => m === mf);

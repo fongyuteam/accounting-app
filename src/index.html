@@ -496,7 +496,10 @@ tr:hover td { background:var(--bg); }
         <div class="fg c1"><textarea id="in-note" placeholder="備註（選填）"></textarea></div>
         <div class="fa"><button class="btn btn-primary" onclick="addIncome()">✓ 新增入帳</button></div>
       </div>
-      <div class="filter-row"><input type="month" id="in-month" onchange="incFilterChanged()" /></div>
+      <div class="filter-row">
+        <input type="month" id="in-month" onchange="incFilterChanged()" />
+        <input type="text" id="in-search" placeholder="搜尋客戶、名稱、類別..." oninput="incFilterChanged()" style="flex:1;min-width:180px" />
+      </div>
       <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>客戶</th><th>款項名稱</th><th>類別</th><th>金額</th><th>備註</th><th>來源</th><th></th></tr></thead><tbody id="incTbody"></tbody></table></div>
       <div id="incPager" class="pager"></div>
     </div>
@@ -510,7 +513,10 @@ tr:hover td { background:var(--bg); }
         <div class="fg c1"><textarea id="ex-note" placeholder="備註（選填）"></textarea></div>
         <div class="fa"><button class="btn btn-primary" onclick="addExpense()">✓ 新增出帳</button></div>
       </div>
-      <div class="filter-row"><input type="month" id="ex-month" onchange="expFilterChanged()" /></div>
+      <div class="filter-row">
+        <input type="month" id="ex-month" onchange="expFilterChanged()" />
+        <input type="text" id="ex-search" placeholder="搜尋廠商、名稱、類別..." oninput="expFilterChanged()" style="flex:1;min-width:180px" />
+      </div>
       <div class="tbl-wrap"><table><thead><tr><th>日期</th><th>廠商</th><th>支出名稱</th><th>類別</th><th>金額</th><th>備註</th><th>來源</th><th></th></tr></thead><tbody id="expTbody"></tbody></table></div>
       <div id="expPager" class="pager"></div>
     </div>
@@ -540,6 +546,7 @@ tr:hover td { background:var(--bg); }
       <div class="filter-row">
         <select id="cl-filter" onchange="recvFilterChanged()"><option value="all">全部狀態</option><option value="pending">待付款</option><option value="overdue">已逾期</option><option value="paid">已付款</option></select>
         <input type="month" id="cl-month" onchange="recvFilterChanged()" />
+        <input type="text" id="cl-search" placeholder="搜尋客戶、說明、單號..." oninput="recvFilterChanged()" style="flex:1;min-width:180px" />
       </div>
       <div class="tbl-wrap"><table><thead><tr><th>開立日期</th><th>應付日期</th><th>客戶</th><th>說明</th><th>單號</th><th>金額</th><th>狀態</th><th>操作</th></tr></thead><tbody id="recvTbody"></tbody></table></div>
       <div id="recvPager" class="pager"></div>
