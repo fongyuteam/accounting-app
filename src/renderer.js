@@ -6,7 +6,7 @@ let analyzedRows = null;
 
 // ── 通用分頁 ──
 let incPage = 1, expPage = 1, recvPage = 1, allPage = 1, monthlyPage = 1;
-const PAGE_SIZE = 15;         // 入帳/出帳/客戶付款追蹤 每頁筆數
+const PAGE_SIZE = 10;         // 入帳/出帳/客戶付款追蹤 每頁筆數
 const ALL_PAGE_SIZE = 10;     // 所有紀錄 每頁筆數
 const MONTHLY_PAGE_SIZE = 3;  // 每月收支明細 每頁月份數
 
@@ -155,13 +155,21 @@ window.api = {
   income: {
     getAll: () => _get('/api/income'),
     add:    d  => _post('/api/income', d),
-    delete: id => _del(`/api/income/${id}`)
+    delete: id => _del(`/api/income/${id}`),
+    importCSV: async () => {
+      const f = await _pickFile('_csvIncInput'); if (!f) return null;
+      return _post('/api/income/import-csv', { content: await f.text() });
+    }
   },
   expense: {
     getAll: () => _get('/api/expense'),
     add:    d  => _post('/api/expense', d),
     update: d  => _put('/api/expense', d),
-    delete: id => _del(`/api/expense/${id}`)
+    delete: id => _del(`/api/expense/${id}`),
+    importCSV: async () => {
+      const f = await _pickFile('_csvExpInput'); if (!f) return null;
+      return _post('/api/expense/import-csv', { content: await f.text() });
+    }
   },
   receivables: {
     getAll:    () => _get('/api/receivables'),
@@ -545,6 +553,128 @@ async function confirmCSVImport(rows) {
   }, 4000);
 }
 
+// ── 入帳 CSV 匯入 ──
+async function importIncomeCSV() {
+  const result = await window.api.income.importCSV();
+  if (!result) return;
+
+  const { rows } = result;
+  if (!rows || rows.length === 0) {
+    toast('找不到有效資料，請確認 CSV 格式正確', true);
+    return;
+  }
+
+  const statusEl = document.getElementById('incCsvImportStatus');
+  const previewRows = rows.slice(0, 5).map(r =>
+    `<tr>
+      <td>${escHtml(r.client)}</td>
+      <td>${escHtml(r.title)}</td>
+      <td>${escHtml(r.date)}</td>
+      <td style="font-weight:500">NT$${Number(r.amount).toLocaleString()}</td>
+      <td><span class="badge b-inc">${escHtml(r.category)}</span></td>
+    </tr>`
+  ).join('');
+
+  statusEl.innerHTML = `
+    <div class="tbl-wrap" style="margin-bottom:12px">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:500">
+        預覽前 ${Math.min(5, rows.length)} 筆（共 ${rows.length} 筆）
+      </div>
+      <table>
+        <thead><tr><th>客戶</th><th>款項名稱</th><th>日期</th><th>金額</th><th>類別</th></tr></thead>
+        <tbody>${previewRows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn" onclick="document.getElementById('incCsvImportStatus').innerHTML=''">取消</button>
+      <button class="btn btn-primary" onclick="confirmIncomeCSVImport(${JSON.stringify(rows).replace(/"/g,'&quot;')})">
+        ✓ 確認匯入全部 ${rows.length} 筆
+      </button>
+    </div>`;
+}
+
+async function confirmIncomeCSVImport(rows) {
+  if (typeof rows === 'string') rows = JSON.parse(rows.replace(/&quot;/g,'"'));
+  let count = 0;
+  for (const r of rows) {
+    await window.api.income.add(r);
+    await window.api.customers.autoAdd({name:r.client, type:'income'});
+    count++;
+  }
+  await renderIncome();
+  await renderCustomers();
+  updateSummary();
+  document.getElementById('incCsvImportStatus').innerHTML = `
+    <div class="status-msg" style="color:var(--ok);margin-bottom:12px">
+      ✓ 成功匯入 ${count} 筆入帳！
+    </div>`;
+  setTimeout(() => {
+    const el = document.getElementById('incCsvImportStatus');
+    if (el) el.innerHTML = '';
+  }, 4000);
+}
+
+// ── 出帳 CSV 匯入 ──
+async function importExpenseCSV() {
+  const result = await window.api.expense.importCSV();
+  if (!result) return;
+
+  const { rows } = result;
+  if (!rows || rows.length === 0) {
+    toast('找不到有效資料，請確認 CSV 格式正確', true);
+    return;
+  }
+
+  const statusEl = document.getElementById('expCsvImportStatus');
+  const previewRows = rows.slice(0, 5).map(r =>
+    `<tr>
+      <td>${escHtml(r.vendor)}</td>
+      <td>${escHtml(r.title)}</td>
+      <td>${escHtml(r.date)}</td>
+      <td style="font-weight:500">NT$${Number(r.amount).toLocaleString()}</td>
+      <td><span class="badge b-exp">${escHtml(r.category)}</span></td>
+    </tr>`
+  ).join('');
+
+  statusEl.innerHTML = `
+    <div class="tbl-wrap" style="margin-bottom:12px">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:500">
+        預覽前 ${Math.min(5, rows.length)} 筆（共 ${rows.length} 筆）
+      </div>
+      <table>
+        <thead><tr><th>廠商</th><th>支出名稱</th><th>日期</th><th>金額</th><th>類別</th></tr></thead>
+        <tbody>${previewRows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:16px">
+      <button class="btn" onclick="document.getElementById('expCsvImportStatus').innerHTML=''">取消</button>
+      <button class="btn btn-primary" onclick="confirmExpenseCSVImport(${JSON.stringify(rows).replace(/"/g,'&quot;')})">
+        ✓ 確認匯入全部 ${rows.length} 筆
+      </button>
+    </div>`;
+}
+
+async function confirmExpenseCSVImport(rows) {
+  if (typeof rows === 'string') rows = JSON.parse(rows.replace(/&quot;/g,'"'));
+  let count = 0;
+  for (const r of rows) {
+    await window.api.expense.add(r);
+    await window.api.customers.autoAdd({name:r.vendor, type:'expense'});
+    count++;
+  }
+  await renderExpense();
+  await renderCustomers();
+  updateSummary();
+  document.getElementById('expCsvImportStatus').innerHTML = `
+    <div class="status-msg" style="color:var(--ok);margin-bottom:12px">
+      ✓ 成功匯入 ${count} 筆出帳！
+    </div>`;
+  setTimeout(() => {
+    const el = document.getElementById('expCsvImportStatus');
+    if (el) el.innerHTML = '';
+  }, 4000);
+}
+
 // ── 應收帳款 ──
 function getStatus(r) {
   if(r.status==='paid') return 'paid';
@@ -602,10 +732,11 @@ async function markPaid(id) {
   // 確認付款
   await window.api.receivables.markPaid(id);
 
-  // 自動同步新增到入帳管理：用「應收帳款的開立日期」而非「確認收款當天」，
-  // 這樣不管客戶延後多久才付款，都會算在原本款項所屬的月份
+  // 自動同步新增到入帳管理：優先用說明文字判斷出的月份（例如「115年5月服務費」→ 2026-05-01），
+  // 這樣入帳管理顯示的日期本身就會是對的月份，不用每個地方額外判斷；判斷不出來才 fallback 用開立日期
+  const parsedMonth = parseMonthFromText(recv.description);
   await window.api.income.add({
-    date: recv.issue_date,
+    date: parsedMonth ? `${parsedMonth}-01` : recv.issue_date,
     client: recv.client,
     amount: recv.amount,
     title: recv.description || '客戶付款',
@@ -846,6 +977,25 @@ async function dbRestore() {
   if (!await confirmDialog('還原後目前所有資料將被備份檔覆蓋，確定繼續？')) return;
   const ok = await window.api.db.restore();
   if (ok) { toast('還原成功，重新載入中...'); setTimeout(() => location.reload(), 1500); }
+}
+
+// 一次性修正工具：掃描所有「來自客戶付款追蹤」的入帳紀錄，用款項名稱（原始說明文字）
+// 重新判斷月份，日期跟判斷結果不一樣就更新成該月 1 號。用來修正舊版邏輯留下的錯誤日期。
+async function fixConfirmedPaymentDates() {
+  if (!await confirmDialog('這會掃描所有「付款確認」來源的入帳紀錄，把日期改成款項名稱判斷出來的月份（該月1號）。確定要執行嗎？')) return;
+  const all = await window.api.income.getAll();
+  const targets = all.filter(r => r.source === 'recv');
+  let fixed = 0, skipped = 0;
+  for (const r of targets) {
+    const parsed = parseMonthFromText(r.title);
+    if (!parsed) { skipped++; continue; }
+    const correctDate = `${parsed}-01`;
+    if (r.date === correctDate) { skipped++; continue; }
+    await window.api.income.update({ id: r.id, date: correctDate, client: r.client, title: r.title, category: r.category, amount: r.amount, note: r.note });
+    fixed++;
+  }
+  await renderIncome(); await renderAll(); updateSummary();
+  toast(`已修正 ${fixed} 筆付款確認紀錄的日期${skipped ? `，${skipped} 筆略過（無法判斷月份或日期已正確）` : ''}`);
 }
 
 // ── 客戶管理 ──

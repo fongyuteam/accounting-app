@@ -552,6 +552,88 @@ ipcMain.handle('receivables:importCSV', async () => {
   return { count: rows.length, rows };
 });
 
+// ── 匯入入帳 CSV ──
+ipcMain.handle('income:importCSV', async () => {
+  const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: '選擇入帳 CSV 檔案',
+    filters: [{ name: 'CSV', extensions: ['csv'] }],
+    properties: ['openFile']
+  });
+  if (!filePaths || !filePaths[0]) return null;
+
+  const content = fs.readFileSync(filePaths[0], 'utf-8').replace(/^\uFEFF/, '');
+  const lines = content.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { count: 0, rows: [] };
+
+  const headers = parseCSVLine(lines[0]);
+  const rows = [];
+  const validCats = ['服務費','產品銷售','顧問費','維護費','其他'];
+
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseCSVLine(lines[i]);
+    if (vals.length < 3) continue;
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+
+    const amount = parseFloat(row['金額'] || 0);
+    const client = row['客戶名稱'] || '';
+    if (!client || !amount) continue;
+
+    rows.push({
+      date: row['日期'] || localDateStr(),
+      client,
+      title: row['款項名稱'] || '匯入',
+      amount,
+      category: validCats.includes(row['類別']) ? row['類別'] : '其他',
+      note: row['備註'] || '',
+      source: 'excel'
+    });
+  }
+
+  return { count: rows.length, rows };
+});
+
+// ── 匯入出帳 CSV ──
+ipcMain.handle('expense:importCSV', async () => {
+  const { filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: '選擇出帳 CSV 檔案',
+    filters: [{ name: 'CSV', extensions: ['csv'] }],
+    properties: ['openFile']
+  });
+  if (!filePaths || !filePaths[0]) return null;
+
+  const content = fs.readFileSync(filePaths[0], 'utf-8').replace(/^\uFEFF/, '');
+  const lines = content.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { count: 0, rows: [] };
+
+  const headers = parseCSVLine(lines[0]);
+  const rows = [];
+  const validCats = ['租金','薪資','設備','軟體訂閱','行銷','差旅','水電','其他'];
+
+  for (let i = 1; i < lines.length; i++) {
+    const vals = parseCSVLine(lines[i]);
+    if (vals.length < 3) continue;
+    const row = {};
+    headers.forEach((h, idx) => { row[h] = vals[idx] || ''; });
+
+    const amount = parseFloat(row['金額'] || 0);
+    const vendor = row['廠商名稱'] || '';
+    if (!vendor || !amount) continue;
+
+    rows.push({
+      date: row['日期'] || localDateStr(),
+      vendor,
+      title: row['支出名稱'] || '匯入',
+      amount,
+      category: validCats.includes(row['類別']) ? row['類別'] : '其他',
+      note: row['備註'] || '',
+      source: 'excel'
+    });
+  }
+
+  return { count: rows.length, rows };
+});
+
 // ── 匯入客戶名單 CSV ──
 ipcMain.handle('customers:importCSV', async () => {
   const { filePaths } = await dialog.showOpenDialog(mainWindow, {

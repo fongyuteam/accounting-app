@@ -10,13 +10,15 @@ contextBridge.exposeInMainWorld('api', {
     getAll: () => ipcRenderer.invoke('income:getAll'),
     add: (d) => ipcRenderer.invoke('income:add', d),
     update: (d) => ipcRenderer.invoke('income:update', d),
-    delete: (id) => ipcRenderer.invoke('income:delete', id)
+    delete: (id) => ipcRenderer.invoke('income:delete', id),
+    importCSV: () => ipcRenderer.invoke('income:importCSV')
   },
   expense: {
     getAll: () => ipcRenderer.invoke('expense:getAll'),
     add: (d) => ipcRenderer.invoke('expense:add', d),
     update: (d) => ipcRenderer.invoke('expense:update', d),
-    delete: (id) => ipcRenderer.invoke('expense:delete', id)
+    delete: (id) => ipcRenderer.invoke('expense:delete', id),
+    importCSV: () => ipcRenderer.invoke('expense:importCSV')
   },
   receivables: {
     getAll: () => ipcRenderer.invoke('receivables:getAll'),
